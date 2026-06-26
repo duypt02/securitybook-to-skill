@@ -1,0 +1,50 @@
+artifacts:
+  - name: SKILL.md
+    prompt: generate_skill.md
+    required: true
+
+  - name: chapters
+    required: true
+
+  - name: glossary.md
+    required: true
+
+  - name: patterns.md
+    required: true
+
+  - name: cheatsheet.md
+    required: true
+
+  - name: checklist.md
+    prompt: generate_checklist.md
+    required: true
+
+  - name: commands.md
+    prompt: generate_commands.md
+    required: true
+
+  - name: workflows.md
+    prompt: generate_workflows.md
+    required: true
+
+  - name: troubleshooting.md
+    prompt: generate_troubleshooting.md
+    required: true
+
+  - name: reporting.md
+    prompt: generate_reporting.md
+    required: true
+
+  - name: safety.md
+    prompt: generate_safety.md
+    required: true
+
+  - name: references.md
+    prompt: generate_references.md
+    required: true
+
+  - name: coverage.json
+    required: true
+
+  - name: citations.json
+    required: true

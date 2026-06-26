@@ -22,3 +22,5 @@ site/
 docs/guide.md
 docs/skill-reference.md
 docs/BACKERS.md
+outputs/
+books_test/

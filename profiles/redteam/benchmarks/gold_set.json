@@ -1,0 +1,70 @@
+{
+  "benchmarks": {
+    "owasp_web": {
+      "min_score": 80,
+      "min_found_concepts": 10,
+      "min_command_count": 5,
+      "required_concepts": [
+        "information-gathering",
+        "authentication-testing",
+        "authorization-testing",
+        "input-validation-testing",
+        "session-management-testing",
+        "final-report"
+      ],
+      "required_command_terms": ["nmap", "curl", "openssl"]
+    },
+    "nist_methodology": {
+      "min_score": 80,
+      "min_found_concepts": 8,
+      "min_command_count": 0,
+      "required_concepts": [
+        "information-security-assessment-methodology",
+        "technical-assessment-techniques",
+        "security-assessment-planning",
+        "security-assessment-execution",
+        "post-testing-activities",
+        "final-report"
+      ],
+      "required_command_terms": []
+    },
+    "ai_redteam": {
+      "min_score": 80,
+      "min_found_concepts": 10,
+      "min_command_count": 5,
+      "required_concepts": [
+        "ai-threat-modeling",
+        "ai-agent-attacks",
+        "rag-pipeline-exploitation",
+        "mcp-tool-surface-attacks",
+        "ai-supply-chain-attacks",
+        "ai-infrastructure-deployment-exploits",
+        "final-report"
+      ],
+      "required_command_terms": ["curl", "python", "proxychains"]
+    },
+    "classic_pentest": {
+      "min_score": 82,
+      "min_found_concepts": 18,
+      "min_command_count": 25,
+      "required_concepts": [
+        "network-port-scanning",
+        "service-enumeration",
+        "vulnerability-scanning",
+        "web-application-attacks",
+        "exploit-research-and-adaptation",
+        "password-attacks",
+        "windows-privilege-escalation",
+        "linux-privilege-escalation",
+        "port-redirection-and-tunneling",
+        "metasploit-framework",
+        "active-directory-enumeration",
+        "active-directory-attacks",
+        "lateral-movement",
+        "post-exploitation",
+        "final-report"
+      ],
+      "required_command_terms": ["nmap", "dnsrecon", "nc", "impacket", "curl"]
+    }
+  }
+}

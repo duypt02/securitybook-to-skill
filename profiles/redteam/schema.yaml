@@ -1,0 +1,36 @@
+skill:
+  required_fields:
+    - skill_name
+    - objective
+    - context
+    - preconditions
+    - procedure
+    - tools_commands
+    - expected_outputs
+    - safety_constraints
+    - references
+
+  optional_fields:
+    - inputs
+    - decision_points
+    - troubleshooting
+    - reporting_notes
+    - related_skills
+
+knowledge_types:
+  conceptual:
+    description: "Definitions, principles, concepts, technical background"
+  procedural:
+    description: "Ordered steps, methodology, workflows"
+  command:
+    description: "Commands, parameters, scripts, configuration snippets"
+  tool:
+    description: "Tool usage, tool workflow, output interpretation"
+  scenario:
+    description: "Lab context, assumptions, preconditions, applicable situations"
+  troubleshooting:
+    description: "Common errors, failure cases, fixes"
+  reporting:
+    description: "Evidence, notes, findings, report guidance"
+  safety:
+    description: "Legal, ethical, authorized-use constraints"

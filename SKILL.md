@@ -1,6 +1,6 @@
 ---
 name: book-to-skill
-description: "Converts books and documents (PDF, EPUB, DOCX, HTML, Markdown, plain text, RTF, MOBI/AZW with Calibre) into structured agent skills, extracting frameworks, mental models, principles, techniques, and anti-patterns. Use when the user wants to study a document through GitHub Copilot CLI, Amp, or Claude Code, apply an author's frameworks while working, or build a reusable knowledge base from a file."
+description: "Converts books and documents (PDF, EPUB, DOCX, HTML, Markdown, plain text, RTF, MOBI/AZW with Calibre) into structured agent skills, extracting frameworks, mental models, principles, techniques, and anti-patterns. Use when the user wants to study a document through GitHub Copilot CLI, Amp, or Claude Code, apply an author's frameworks while working, build a reusable knowledge base from a file, or generate a Red Team/Pentest skill through the redteam profile prototype."
 ---
 
 <!--
@@ -38,7 +38,7 @@ Books contain crystallized expertise: frameworks, principles, and techniques tha
 
 ## Modes of Operation
 
-Four paths available. Route based on what the user asks:
+Five paths available. Route based on what the user asks:
 
 ### 1. Full Conversion (Default)
 **Trigger:** User provides one or more document/directory/glob paths without special instructions
@@ -59,6 +59,22 @@ Four paths available. Route based on what the user asks:
 **Trigger:** User provides one or more new source paths and indicates they want to update an existing skill (either by pointing to the existing skill folder, providing a skill slug that already exists in `SKILLS_HOME`, or explicitly requesting an update).
 **Action:** Run Step 0 (out-of-scope check), Step 1 (validate inputs), Step 1.5 (identify book type), and Step 2 (extract new files). Then skip to Step 5 (identify/detect existing skill path) and run the **Update / Fold-in Workflow** to merge the new content into the existing skill files.
 **Output:** Updated existing skill with new/revised chapter summaries and merged indexes/glossaries.
+
+### 5. Red Team/Pentest Profile (Prototype)
+**Trigger:** User asks for a Red Team, Pentest, offensive security, security testing, or assessment-focused skill; asks to use `--profile redteam`; or provides documents such as OWASP WSTG, NIST SP 800-115, OFFSEC/OSCP/PEN material, AI red-team material, or internal penetration-test methodology.
+
+**Action:** Preserve the core extraction pipeline, then use the standalone profile generator:
+
+1. Run Step 0, Step 1, Step 1.5, and Step 2. For PDFs, prefer `BOOK_TYPE=technical` so Docling preserves structure.
+2. Load the profile contract from `profiles/redteam/schema.yaml`.
+3. Load the artifact contract from `profiles/redteam/artifacts.yaml`.
+4. Load prompt templates from `profiles/redteam/prompts/`.
+5. Run `tools/generate_redteam_skill.py`.
+6. Run `tools/evaluate_redteam_skill.py` and report the quality findings.
+
+**Output:** A Red Team/Pentest skill folder containing the original skill-style files plus profile-specific artifacts: `SKILL.md`, `chapters/`, `glossary.md`, `patterns.md`, `cheatsheet.md`, `checklist.md`, `commands.md`, `workflows.md`, `troubleshooting.md`, `reporting.md`, `safety.md`, `references.md`, `coverage.json`, and `citations.json`.
+
+Use the profile as an academic prototype and demo path, not as an autonomous attack system. Generated commands must keep placeholders, source citations, command context, and safety notes. Always preserve authorized-use constraints and scope boundaries.
 
 ---
 
@@ -168,6 +184,30 @@ This creates:
 - `<tempdir>/book_skill_work/metadata.json` — overall combined size, words, pages, token counts, and a detailed list of individual processed `sources`.
 
 Read `<tempdir>/book_skill_work/metadata.json` to inspect the results.
+
+### Red Team/Pentest profile command path
+
+When Mode 5 applies, do not rewrite the core book-to-skill generation steps. After extraction, run the profile generator against the extracted text and metadata:
+
+```bash
+python3 tools/generate_redteam_skill.py \
+  /tmp/book_skill_work/full_text.txt \
+  /tmp/book_skill_work/metadata.json \
+  --profile profiles/redteam \
+  --out outputs/<skill-name>
+```
+
+Then evaluate the generated skill:
+
+```bash
+python3 tools/evaluate_redteam_skill.py \
+  outputs/<skill-name> \
+  --profile profiles/redteam \
+  --source /tmp/book_skill_work/full_text.txt \
+  --metadata /tmp/book_skill_work/metadata.json
+```
+
+For report/demo runs, include the evaluator result plus a short qualitative note. For example: methodology documents such as NIST SP 800-115 can score well on workflow, reporting, and evidence coverage even when `commands.md` intentionally contains few or no executable commands.
 
 ---
 

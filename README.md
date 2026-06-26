@@ -21,6 +21,7 @@
 <p align="center">
   <a href="#-why">Why</a> ·
   <a href="#-what-it-generates">What it generates</a> ·
+  <a href="#-red-teampentest-profile-prototype">Red Team/Pentest profile</a> ·
   <a href="#-beyond-books">Beyond books</a> ·
   <a href="#-usage">Usage</a> ·
   <a href="#-requirements">Requirements</a> ·
@@ -75,6 +76,82 @@ Running `/book-to-skill your-book.pdf` (or a folder, glob, or list of files) cre
 | `cheatsheet.md` | Decision tables and quick-reference rules | ~1,000 tokens |
 
 **Chapter files are loaded on-demand** — they don't count against the skill budget until you ask about that topic.
+
+---
+
+## 🛡️ Red Team/Pentest profile prototype
+
+This repository also contains a minimal profile-based extension for Red Team and penetration-testing documents. The extension is intentionally standalone, so the original book-to-skill pipeline remains intact while the prototype can generate domain-specific artifacts for academic evaluation and demos.
+
+Profile files live in `profiles/redteam/`:
+
+| File | Purpose |
+|------|---------|
+| `schema.yaml` | Red Team Skill fields, required sections, knowledge types, and safety constraints |
+| `artifacts.yaml` | Output artifact contract for the Red Team profile |
+| `prompts/` | Prompt templates for each artifact |
+| `benchmarks/gold_set.json` | Evaluation expectations for OWASP, NIST, OFFSEC AI-300, and PEN200 style sources |
+
+The Red Team generator writes the standard book-to-skill files plus Red Team-specific artifacts:
+
+| Artifact | Purpose |
+|----------|---------|
+| `SKILL.md` | Main Red Team/Pentest skill entry point |
+| `chapters/` | Source-grounded section files generated from document structure |
+| `glossary.md`, `patterns.md`, `cheatsheet.md` | Supporting reference files compatible with the original design |
+| `checklist.md` | Testing and assessment checklist |
+| `commands.md` | Commands with context, placeholders, citations, and safety notes |
+| `workflows.md` | Phase-oriented Red Team/Pentest workflows |
+| `troubleshooting.md` | Common failure modes and fixes |
+| `reporting.md` | Finding and evidence reporting guidance |
+| `safety.md` | Authorized-use, scope, and operational safety constraints |
+| `references.md` | Source references and citation map |
+| `coverage.json`, `citations.json` | Machine-readable evaluation metadata |
+
+### Demo workflow
+
+Use Docling for technical PDFs so tables, code blocks, and document structure are preserved:
+
+```bash
+python3 scripts/extract.py books_test/OWASP_Testing_Guide_v4.pdf --mode technical --no-install-missing
+
+python3 tools/generate_redteam_skill.py \
+  /tmp/book_skill_work/full_text.txt \
+  /tmp/book_skill_work/metadata.json \
+  --profile profiles/redteam \
+  --out outputs/redteam-owasp-wstg-docling
+
+python3 tools/evaluate_redteam_skill.py \
+  outputs/redteam-owasp-wstg-docling \
+  --profile profiles/redteam \
+  --source /tmp/book_skill_work/full_text.txt \
+  --metadata /tmp/book_skill_work/metadata.json
+```
+
+For an extracted HTML folder such as OFFSEC AI-300:
+
+```bash
+python3 scripts/extract.py "books_test/OffSec - AI-300 Advanced AI Red Teaming" --mode technical --no-install-missing
+```
+
+### Current benchmark snapshot
+
+The prototype has been tested against representative Red Team/Pentest sources under `books_test/`:
+
+| Source | Expected concept coverage | Weak concepts | Commands extracted | Evaluator result | Notes |
+|--------|---------------------------|---------------|--------------------|------------------|-------|
+| OWASP Web Security Testing Guide | 12 found | 1 | 11 | PASS, rubric 100/100 | Strong methodology coverage; limited explicit shell commands in source |
+| NIST SP 800-115 | 12 found | 0 | 0 real commands | PASS, rubric 100/100 | Methodology document; command count is not a suitable quality metric |
+| OFFSEC AI-300 | 13 found | 0 | 80 | PASS, rubric 100/100 | Strong command and AI red-team workflow extraction |
+| PEN200/OSCP material | 20 found | 2 | 80 | PASS, rubric 100/100 | Strong lab-oriented command coverage; some concepts need deeper expansion |
+
+Quality caveats for report/demo use:
+
+- Red Team/Pentest documents differ by purpose. NIST-style methodology documents should be evaluated by process, evidence, and reporting quality, not command count.
+- Offensive training material may include lab credentials, tokens, or exploit strings from the source. Production use should add a redaction layer before publishing generated artifacts.
+- OWASP-style web testing documents contain many procedures and payload examples, but fewer standalone terminal commands. Improving request/payload extraction is a future enhancement.
+
+Supporting report notes are kept in `de_xuat_mo_rong_redteam.md` and `improve_quality`.
 
 ---
 
