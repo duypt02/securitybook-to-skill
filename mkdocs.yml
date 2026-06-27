@@ -1,8 +1,8 @@
-site_name: book-to-skill
+site_name: securitybook-to-skill
 site_description: Convert books and documents into structured, on-demand agent skills.
 site_url: https://booktoskill.is-a.dev/
-repo_url: https://github.com/virgiliojr94/book-to-skill
-repo_name: virgiliojr94/book-to-skill
+repo_url: https://github.com/duypt02/securitybook-to-skill
+repo_name: duypt02/securitybook-to-skill
 edit_uri: ""
 
 # index.md is a committed landing page. Guide (README.md) and Skill Reference

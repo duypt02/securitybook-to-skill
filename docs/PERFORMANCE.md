@@ -31,10 +31,11 @@ tables and code as markdown. Pick text mode for prose, technical mode for code/t
 
 ## The Discovery Loop Tax
 
-Tokens entering context to answer **one** targeted question. book-to-skill loads a
+Tokens entering context to answer **one** targeted question. The original
+book-to-skill skill format loads a
 resident core (~4K) plus one compiled chapter (~1K) ≈ **5,000 tokens**.
 
-| Book (chapter size) | Context-dump | Discovery loop | book-to-skill | vs dump / loop |
+| Book (chapter size) | Context-dump | Discovery loop | skill format | vs dump / loop |
 |---------------------|-------------:|---------------:|--------------:|:--------------:|
 | Think Python 2 (small) | 119,264 | 12,152 | ~5,000 | 24× / 2.4× |
 | Working Backwards (medium) | 175,253 | 33,444 | ~5,000 | 35× / 6.7× |

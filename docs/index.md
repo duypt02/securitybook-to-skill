@@ -4,67 +4,76 @@ hide:
   - toc
 ---
 
-# book-to-skill
+# securitybook-to-skill
 
 <p style="font-size: 1.25rem; max-width: 42rem;">
-Turn any book or document into a structured, on-demand agent skill — named frameworks, decision rules, and anti-patterns. <strong>Structure, not a summary.</strong>
+Generate Red Team and penetration-testing skill artifacts from technical security documents. The prototype keeps the original book-to-skill extraction model, adds a `profiles/redteam/` contract, and evaluates generated artifacts for coverage, safety, commands, workflows, and references.
 </p>
 
 [Get started](guide.md){ .md-button .md-button--primary }
 [Skill reference](skill-reference.md){ .md-button }
-[GitHub](https://github.com/virgiliojr94/book-to-skill){ .md-button }
+[GitHub](https://github.com/duypt02/securitybook-to-skill){ .md-button }
 
 ---
 
-## Why book-to-skill
+## Why securitybook-to-skill
 
 <div class="grid cards" markdown>
 
--   :material-file-document-multiple:{ .lg .middle } __Multi-format__
+-   :material-shield-search:{ .lg .middle } __Red Team/Pentest profile__
 
     ---
 
-    PDF, EPUB, DOCX, HTML, Markdown, RTF, MOBI/AZW (via Calibre). Extraction runs
-    locally with graceful stdlib fallbacks — no upload, no lock-in.
+    Domain schema, artifact contract, and prompt templates for OWASP, NIST,
+    OFFSEC, PEN200, AI Red Teaming, and similar technical security material.
 
--   :material-brain:{ .lg .middle } __Structure, not summaries__
-
-    ---
-
-    Named frameworks, mental models, decision rules, and anti-patterns — the
-    author's toolkit, captured with their exact terms, not a book report.
-
--   :material-flash:{ .lg .middle } __On-demand chapters__
+-   :material-file-document-multiple:{ .lg .middle } __Docling-aware extraction__
 
     ---
 
-    Per-chapter files load only when the topic is relevant, so a 200-page book
-    costs tokens proportional to the question, not the page count.
+    Technical mode preserves source structure for PDFs and document folders,
+    then feeds the profile generator through `full_text.txt` and `metadata.json`.
 
--   :material-robot-happy:{ .lg .middle } __Multi-agent__
+-   :material-console:{ .lg .middle } __Security artifacts__
 
     ---
 
-    One `SKILL.md` runs on Claude Code, GitHub Copilot CLI, and Amp through the
-    open Agent Skills standard.
+    Generates `SKILL.md`, chapters, checklist, commands, workflows,
+    troubleshooting, reporting, safety, references, coverage, and citations.
+
+-   :material-check-decagram:{ .lg .middle } __Evaluator-backed demo__
+
+    ---
+
+    Checks required artifacts, schema sections, command context, authorized-use
+    constraints, references, source citations, and benchmark concept coverage.
 
 </div>
 
 ## Install
 
-**As an agent skill** (gives you the `/book-to-skill` command in Claude Code, Copilot CLI, Amp):
+**Clone the Red Team/Pentest prototype:**
 
 ```bash
-git clone https://github.com/virgiliojr94/book-to-skill.git ~/.claude/skills/book-to-skill
-# then, in your agent session:
-/book-to-skill /path/to/book.pdf [skill-name]
+git clone https://github.com/duypt02/securitybook-to-skill.git
+cd securitybook-to-skill
+python3 scripts/extract.py books_test/OWASP_Testing_Guide_v4.pdf --mode technical --no-install-missing
 ```
 
-**As a standalone CLI** (just the text extractor, optional):
+**Generate and evaluate a Red Team skill:**
 
 ```bash
-pip install "book-to-skill[pdf,epub,docx]"
-book-to-skill /path/to/book.pdf --mode text
+python3 tools/generate_redteam_skill.py \
+  /tmp/book_skill_work/full_text.txt \
+  /tmp/book_skill_work/metadata.json \
+  --profile profiles/redteam \
+  --out outputs/redteam-owasp-wstg-docling
+
+python3 tools/evaluate_redteam_skill.py \
+  outputs/redteam-owasp-wstg-docling \
+  --profile profiles/redteam \
+  --source /tmp/book_skill_work/full_text.txt \
+  --metadata /tmp/book_skill_work/metadata.json
 ```
 
 ## Learn more
@@ -75,7 +84,7 @@ book-to-skill /path/to/book.pdf --mode text
 
     ---
 
-    How the deterministic extractor and the spec-driven generator fit together.
+    How the deterministic extractor and the profile-driven generator fit together.
 
 -   :material-speedometer:{ .lg .middle } __[Performance](PERFORMANCE.md)__
 
@@ -89,10 +98,11 @@ book-to-skill /path/to/book.pdf --mode text
 
     The full `SKILL.md` spec: every step, depth budget, and quality rule.
 
--   :material-heart:{ .lg .middle } __[Sponsor](https://github.com/sponsors/virgiliojr94)__
+-   :material-shield-check:{ .lg .middle } __Red Team profile__
 
     ---
 
-    book-to-skill is free and MIT. Sponsoring funds reviews, releases, and fixes.
+    See `profiles/redteam/`, `tools/generate_redteam_skill.py`, and
+    `tools/evaluate_redteam_skill.py` for the academic prototype implementation.
 
 </div>

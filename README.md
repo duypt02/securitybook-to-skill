@@ -1,22 +1,20 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="book-to-skill logo" width="120">
+  <img src="docs/assets/logo.png" alt="securitybook-to-skill logo" width="120">
 </p>
 
-<h1 align="center">book-to-skill</h1>
+<h1 align="center">securitybook-to-skill</h1>
 
 <p align="center">
-  <strong>Turn any technical book, document folder, or collection of sources into a unified agent skill — ready to study, reference, and use while you work in GitHub Copilot CLI, Amp, or Claude Code.</strong>
+  <strong>Extend book-to-skill for Red Team and penetration-testing documents: extract technical sources with Docling, generate source-grounded security skill artifacts, and evaluate coverage, safety, commands, workflows, and references.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/virgiliojr94/book-to-skill/releases"><img src="https://img.shields.io/github/v/release/virgiliojr94/book-to-skill?style=for-the-badge&color=blueviolet" alt="Latest release"></a>
+  <a href="https://github.com/duypt02/securitybook-to-skill"><img src="https://img.shields.io/badge/Red_Team_Profile-enabled-red?style=for-the-badge" alt="Red Team profile enabled"></a>
   <img src="https://img.shields.io/badge/Agent_Skills-Open_Standard-blueviolet?style=for-the-badge" alt="Agent Skills standard">
+  <img src="https://img.shields.io/badge/Docling-required-orange?style=for-the-badge" alt="Docling required">
   <img src="https://img.shields.io/badge/PDF%20%E2%80%A2%20EPUB%20%E2%80%A2%20DOCX%20%E2%80%A2%20MD%20%E2%80%A2%20HTML%20%E2%80%A2%20RTF%20%E2%80%A2%20MOBI-supported-green?style=for-the-badge" alt="Formats supported">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License">
-  <a href="https://github.com/sponsors/virgiliojr94"><img src="https://img.shields.io/github/sponsors/virgiliojr94?style=for-the-badge&color=ea4aaa&logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
 </p>
-
-[![Trending Repos](https://trending-repos.com/badge/virgiliojr94/book-to-skill.svg)](https://trending-repos.com/repositories/virgiliojr94/book-to-skill)
 
 <p align="center">
   <a href="#-why">Why</a> ·
@@ -35,37 +33,37 @@
 </p>
 
 <p align="center">
-  <strong>24×–51× fewer tokens than dumping the book into context</strong> to answer one question, measured on real books (<a href="#-the-discovery-loop-tax">how it's measured</a>).
+  <strong>Prototype focus:</strong> Red Team/Pentest Skill artifacts from OWASP, NIST, OFFSEC, PEN200, AI Red Teaming, and similar technical security documents.
 </p>
 
 **How it works, in 3 steps:**
 
-1. **Point** it at a file, folder, or glob — `/book-to-skill ./my-book.pdf`
-2. **It distills** the book into a skill — frameworks, decision rules, anti-patterns, and per-chapter files. Structure, not a summary.
-3. **Your agent loads it on demand** — ask `/my-book replication` and it reads the right chapter and answers from the real content, no hallucination.
+1. **Extract** the document with Docling-aware technical mode — `python3 scripts/extract.py ./books_test/source.pdf --mode technical --no-install-missing`
+2. **Generate** Red Team artifacts — `tools/generate_redteam_skill.py` loads `profiles/redteam/schema.yaml`, `artifacts.yaml`, and prompt templates.
+3. **Evaluate** quality — `tools/evaluate_redteam_skill.py` checks required files, schema sections, command context, safety constraints, references, citations, and benchmark coverage.
 
 ---
 
 ## 🤔 Why
 
-You buy a great technical book. You read it once. Three months later you can't remember chapter 7 existed.
+Red Team and penetration-testing documents are useful, but they are difficult to turn into reusable operational knowledge. A single source may mix methodology, test cases, payloads, commands, evidence requirements, reporting rules, and safety constraints.
 
-The usual workarounds don't help:
-- 📄 "Let me just search the PDF" → you get a list of pages, not answers
-- 🧠 "I'll ask the agent about this book" → it either hallucinates or says it doesn't have the content
-- 📝 "I'll take notes as I read" → you end up with a 200-line doc you never open again
+The usual workarounds are weak for this use case:
+- 📄 Searching the PDF gives isolated matches, not a structured testing workflow.
+- 🧠 Asking an agent over raw text can miss source context or invent missing details.
+- 📝 Manual notes rarely preserve citations, command context, safety boundaries, and reporting structure together.
 
-**book-to-skill solves this by turning the book into a structured skill your agent loads on demand.**
+**securitybook-to-skill extends the original book-to-skill pipeline with a Red Team/Pentest profile.**
 
-Once installed, you just type `/your-book-slug replication` and the agent reads the right chapter and answers from the actual content. No hallucination. No digging through PDFs. The book becomes part of your workflow.
+The prototype extracts technical documents, generates domain-specific artifacts, and evaluates whether the output contains the required files, schema sections, commands with safety notes, authorized-use constraints, references, citations, and benchmark concept coverage.
 
-Works with any host that supports the open [Agent Skills](https://github.com/agentskills/agentskills) standard — GitHub Copilot CLI, Amp, and Claude Code all read the same `SKILL.md` format.
+The generated `SKILL.md` remains compatible with hosts that support the open [Agent Skills](https://github.com/agentskills/agentskills) standard, while the Red Team profile adds the extra artifacts needed for assessment, demo, and academic evaluation.
 
 ---
 
 ## 📦 What it generates
 
-Running `/book-to-skill your-book.pdf` (or a folder, glob, or list of files) creates a full skill in your agent's skills directory (`~/.copilot/skills/<slug>/` for Copilot CLI, `~/.agents/skills/<slug>/` for Amp or cross-agent, `~/.claude/skills/<slug>/` for Claude Code):
+Running the Red Team profile generator creates a full output folder under `outputs/<skill-name>/`:
 
 | File | Purpose | Size |
 |------|---------|------|
@@ -75,7 +73,7 @@ Running `/book-to-skill your-book.pdf` (or a folder, glob, or list of files) cre
 | `patterns.md` | All techniques, algorithms, and design patterns | ~2,000 tokens |
 | `cheatsheet.md` | Decision tables and quick-reference rules | ~1,000 tokens |
 
-**Chapter files are loaded on-demand** — they don't count against the skill budget until you ask about that topic.
+For Red Team/Pentest sources, the prototype also generates `checklist.md`, `commands.md`, `workflows.md`, `troubleshooting.md`, `reporting.md`, `safety.md`, `references.md`, `coverage.json`, and `citations.json`.
 
 ---
 
@@ -170,38 +168,36 @@ If you re-open a document often enough to wish you'd memorized it, it's a candid
 
 ## 🚀 Usage
 
-```
-/book-to-skill <path-to-document-folder-or-glob>... [skill-name-slug]
-```
-
-Supported document formats: PDF, EPUB, DOCX, TXT, Markdown, reStructuredText, AsciiDoc, HTML, RTF, MOBI/AZW/AZW3.
-
-**Examples:**
+The Red Team/Pentest prototype is run in three explicit steps:
 
 ```bash
-# Process several files together into a unified skill
-/book-to-skill ~/papers/paper1.pdf ~/notes/export.txt unified-research
+# 1. Extract source text and metadata with technical mode
+python3 scripts/extract.py books_test/OWASP_Testing_Guide_v4.pdf --mode technical --no-install-missing
 
-# Process all supported files in a folder together
-/book-to-skill ~/workspace/project-docs/ project-knowledge
+# 2. Generate Red Team/Pentest artifacts
+python3 tools/generate_redteam_skill.py \
+  /tmp/book_skill_work/full_text.txt \
+  /tmp/book_skill_work/metadata.json \
+  --profile profiles/redteam \
+  --out outputs/redteam-owasp-wstg-docling
 
-# Process files matching a glob pattern
-/book-to-skill "~/books/*.epub" my-library
-
-# Update/fold new material into an existing skill folder
-/book-to-skill ~/articles/new-paper.pdf ~/.claude/skills/project-knowledge
+# 3. Evaluate quality and accuracy gates
+python3 tools/evaluate_redteam_skill.py \
+  outputs/redteam-owasp-wstg-docling \
+  --profile profiles/redteam \
+  --source /tmp/book_skill_work/full_text.txt \
+  --metadata /tmp/book_skill_work/metadata.json
 ```
 
-After the skill is created, use it like any other agent skill:
+Supported document formats still come from the original extractor: PDF, EPUB, DOCX, TXT, Markdown, reStructuredText, AsciiDoc, HTML, RTF, MOBI/AZW/AZW3.
+
+For HTML/document folders such as OFFSEC AI-300:
 
 ```bash
-/designing-data-intensive-apps                  # load core mental models
-/designing-data-intensive-apps replication      # find and explain a topic
-/designing-data-intensive-apps ch05             # dive into chapter 5
-/designing-data-intensive-apps "what chapters do you have?"
+python3 scripts/extract.py "books_test/OffSec - AI-300 Advanced AI Red Teaming" --mode technical --no-install-missing
 ```
 
-In GitHub Copilot CLI you may need to run `/skills reload` after the file is written so the new skill appears in `/skills list`. Claude Code and Amp pick it up on the next session.
+The generated folder can then be copied into a compatible agent skill directory if you want to use the generated `SKILL.md` interactively.
 
 ---
 
@@ -244,39 +240,41 @@ The extractor tries tools in order per format and uses the first available. If n
 ## ⚙️ How it works
 
 ```
-One file · a folder · a glob · a list of paths
+Red Team/Pentest source
+PDF · HTML folder · DOCX · Markdown · text
      │
      ▼
-Step 1.5 — "Technical or text-heavy book?"
+scripts/extract.py --mode technical
      │
-     ├── technical → Docling  (tables + code blocks as markdown, ~1.5s/page)
-     └── text      → pdftotext → pypdf → pdfminer  (instant)
+     ├── PDF technical mode → Docling  (tables + code blocks as markdown)
+     └── other supported formats → original book-to-skill extractors
      │
      ▼
-scripts/extract.py <paths…> --mode <technical|text>
-  per source: PDF → pdftotext/Docling · EPUB → ebooklib → stdlib zipfile · DOCX/HTML/RTF/…
-  (one bad source is skipped with a warning; the rest still process)
-     │
-     ├── /tmp/book_skill_work/full_text.txt   (all sources merged, with source markers)
-     └── /tmp/book_skill_work/metadata.json   (aggregated stats + per-source array)
+ /tmp/book_skill_work/full_text.txt
+ /tmp/book_skill_work/metadata.json
                │
                ▼
-          Claude analyzes structure
-          (title, author, chapters, ToC — spanning all sources)
-          ── or, if targeting an existing skill: folds new content in (Mode 4)
+ profiles/redteam/
+   schema.yaml      → required sections, fields, safety constraints
+   artifacts.yaml   → output artifact contract
+   prompts/         → artifact templates
                │
                ▼
-          Generates per-chapter summaries  (800–1,200 tokens each)
-          technical → includes Code Examples + Reference Tables sections
-          Generates glossary, patterns, cheatsheet
-          Generates master SKILL.md with core mental models
+ tools/generate_redteam_skill.py
+   classifies source type
+   extracts sections, concepts, commands, workflows, citations
+   writes full Red Team/Pentest artifact set
                │
                ▼
-          Skill written to one of:
-            ~/.copilot/skills/<slug>/   (GitHub Copilot CLI)
-            ~/.agents/skills/<slug>/    (Copilot CLI or Amp, cross-agent)
-            ~/.claude/skills/<slug>/    (Claude Code)
-          /tmp/book_skill_work/         🗑️  cleaned up
+ outputs/<skill-name>/
+   SKILL.md · chapters/ · checklist.md · commands.md
+   workflows.md · troubleshooting.md · reporting.md
+   safety.md · references.md · coverage.json · citations.json
+               │
+               ▼
+ tools/evaluate_redteam_skill.py
+   checks required artifacts, schema sections, command context,
+   safety constraints, references, citations, and benchmark coverage
 ```
 
 **Extraction benchmark** (103-page technical book, CPU only):
@@ -324,16 +322,16 @@ backtracks. Every one of those hops lands in the conversation history and gets
 is then forced to compress what it read at brutal ratios, handing the main agent a
 **degraded summary it can't fact-check** against the source.
 
-book-to-skill pays the navigation cost **once, at compile time**. At runtime the
+The compiled skill format pays the navigation cost **once, at compile time**. At runtime the
 assistant loads a small resident core plus the one pre-compiled chapter it needs —
 no discovery loop, no compress-to-fit, and the full extracted source stays on disk
 for verification.
 
 **Measured, not asserted.** Running [`tools/discovery_tax.py`](tools/discovery_tax.py)
 on three real books — tokens entering context to answer a single targeted question
-(book-to-skill = resident core + one compiled chapter ≈ 5,000 tokens):
+(skill format = resident core + one compiled chapter ≈ 5,000 tokens):
 
-| Book (size) | Context-dump | Discovery loop | book-to-skill | vs dump / loop |
+| Book (size) | Context-dump | Discovery loop | skill format | vs dump / loop |
 |-------------|-------------:|---------------:|--------------:|:--------------:|
 | Think Python 2 (119K, small chapters) | 119,264 | 12,152 | ~5,000 | 24× / **2.4×** |
 | Working Backwards (175K, medium chapters) | 175,253 | 33,444 | ~5,000 | 35× / 6.7× |
@@ -353,7 +351,7 @@ python3 tools/discovery_tax.py --full-text /tmp/book_skill_work/full_text.txt --
 > case; the context-dump cost, by contrast, recurs on **every** turn. (2) The tool
 > needs explicit `Chapter N` / `Capítulo N` headings to segment a book; titles-only
 > or roman-numeral books (and EPUBs extracted without `ebooklib`) won't segment
-> cleanly. book-to-skill wins when you return to the knowledge repeatedly; for a
+> cleanly. A compiled skill wins when you return to the knowledge repeatedly; for a
 > single one-off read, a plain PDF agent is fine.
 
 ---
@@ -364,7 +362,7 @@ python3 tools/discovery_tax.py --full-text /tmp/book_skill_work/full_text.txt --
 
 You can — but every conversation will burn that token budget upfront. A 400-page book is ~200K tokens. With a skill, only the chapters relevant to your question load — typically a SKILL.md core (~4K) plus the one chapter you asked about (~1K). The rest stays on disk until you need it.
 
-The economics are amortization, not size. Pasting the book pays the full token bill **on every turn of every session, forever**. book-to-skill pays the extraction cost **once** and every future conversation loads only the slice it needs. The bigger your context window, the more this matters — a large window makes the dump *possible*, not *cheap*.
+The economics are amortization, not size. Pasting the book pays the full token bill **on every turn of every session, forever**. A compiled skill pays the extraction cost **once** and every future conversation loads only the slice it needs. The bigger your context window, the more this matters — a large window makes the dump *possible*, not *cheap*.
 
 More importantly: raw text injection is retrieval. A skill is reasoning. When you load a chapter file, Claude isn't searching for keyword matches — it's working with pre-extracted named frameworks, principles, and mental models structured for application, not for reading.
 
@@ -386,7 +384,7 @@ Use the big window for what it's good at: a one-off pass over material you'll ne
 
 RAG works at query time: chunk the book → embed everything → find similar vectors → inject into prompt. It's optimized for "find me the part that talks about X."
 
-book-to-skill works at compile time: one deep analysis run extracts the author's actual frameworks, names them, describes when to use each, captures the anti-patterns. The output is structure the author spent years building — not a similarity search over their sentences.
+The skill-generation approach works at compile time: one deep analysis run extracts the author's actual frameworks, names them, describes when to use each, captures the anti-patterns. In this prototype, the Red Team/Pentest profile specializes that idea for security testing procedures, commands, workflows, reporting, safety, references, and citations.
 
 RAG answers: *"here are chunks close to your query."*  
 A skill answers: *"here are the 12 frameworks this author built, ready to reason with."*
@@ -394,9 +392,9 @@ A skill answers: *"here are the 12 frameworks this author built, ready to reason
 Pick by shape of the job:
 
 - **Wide and shallow** — a library of dozens of books, "find the part that mentions X" → a RAG tool (e.g. CandleKeep) wins.
-- **Narrow and deep** — one book or a tight cluster of related sources, frameworks you apply while you work → book-to-skill wins.
+- **Narrow and deep** — one security guide or a tight cluster of related sources, procedures you apply while you work → securitybook-to-skill wins.
 
-They're complementary, not competing: RAG indexes a shelf, book-to-skill masters a spine.
+They're complementary, not competing: RAG indexes a shelf, securitybook-to-skill compiles a focused Red Team/Pentest source into a reusable skill.
 
 ---
 
@@ -404,7 +402,7 @@ They're complementary, not competing: RAG indexes a shelf, book-to-skill masters
 
 For widely-known books (Clean Code, DDIA, Pragmatic Programmer), Claude has general knowledge — but it's compressed, averaged across the entire internet's discussion of the book, and may hallucinate specific quotes or chapter locations.
 
-book-to-skill works from your actual copy. Every framework name, every anti-pattern list, every chapter number is grounded in the text you provided. No training data drift, no hallucinated chapter titles.
+securitybook-to-skill works from your actual copy. Every procedure, command, section, and reference is grounded in the text you provided. No training data drift, no hallucinated chapter titles.
 
 It also shines for books Claude doesn't know at all: niche technical references, internal company documentation, recent publications, translated works.
 
@@ -414,75 +412,43 @@ It also shines for books Claude doesn't know at all: niche technical references,
 
 Absolutely true — if your workflow is "I have 80 separate books and I want to search across all of them," NotebookLM is the right tool.
 
-book-to-skill is built for a different job: you want to go deep on a specific topic or library, having multiple related documents (papers, chapters, notes) folded into a single unified skill, and even updating it over time as new material arrives! This integrates your customized knowledge base right into your coding or writing workflow, rather than in a separate browser tab.
+securitybook-to-skill is built for a different job: you want to go deep on a specific Red Team/Pentest topic, fold related documents into a single skill, and evaluate whether the generated artifacts contain the required safety, command, reporting, workflow, reference, and citation coverage.
 
 ---
 
 ## 📥 Install
 
-> **Two ways to use it, do not confuse them:**
-> - **As an agent skill** (the `/book-to-skill` command in Claude Code, Copilot CLI, or Amp) → **`git clone` into your skills folder** (below). This is what gives you the slash command and the full convert-a-book flow.
-> - **As a standalone CLI** (just the text extractor) → `pip install book-to-skill`, then `book-to-skill --help`. This does **not** register the agent skill; it only installs the extraction engine. See [the CLI section](#standalone-cli-pip).
-
-The skill follows the open [Agent Skills](https://github.com/agentskills/agentskills) standard, so a single install works for any compatible host.
-
-**GitHub Copilot CLI** (personal skill):
+Clone this prototype repository:
 
 ```bash
-git clone https://github.com/virgiliojr94/book-to-skill.git ~/.copilot/skills/book-to-skill
-# then, in a `copilot` session:
-/skills reload
-/skills info book-to-skill
+git clone https://github.com/duypt02/securitybook-to-skill.git
+cd securitybook-to-skill
 ```
 
-Or the cross-agent path that Copilot CLI and Amp both discover:
+Install the required technical PDF extractor:
 
 ```bash
-git clone https://github.com/virgiliojr94/book-to-skill.git ~/.agents/skills/book-to-skill
+pip3 install docling
 ```
 
-**Claude Code**:
-
-Copy this into your Claude Code session:
-
-```
-Install book-to-skill: https://raw.githubusercontent.com/virgiliojr94/book-to-skill/master/SKILL.md
-```
-
-Or manually using standard `git clone` (ensures modular engine files are fetched correctly):
+Check the extractor environment:
 
 ```bash
-git clone https://github.com/virgiliojr94/book-to-skill.git ~/.claude/skills/book-to-skill
+python3 scripts/extract.py --check
 ```
 
-Then in any agent session:
+Then run the Red Team/Pentest workflow from the [Usage](#-usage) section.
 
-```bash
-/book-to-skill ~/path/to/your-book.pdf
-# or
-/book-to-skill ~/path/to/your-book.epub
-```
-
-### Standalone CLI (pip)
-
-`pip install book-to-skill` is a **separate, optional** path. It installs only the
-text-extraction engine as a CLI, for scripting or to grab the optional extractors;
-it does **not** register the `/book-to-skill` agent skill (use the `git clone` above
-for that).
-
-```bash
-pip install "book-to-skill[pdf,epub,docx]"   # engine + optional extractors
-book-to-skill ~/path/to/book.pdf --mode text  # or: python -m book_to_skill ...
-book-to-skill --check                          # report which extractors are installed
-```
+The original `book-to-skill` Python package metadata is intentionally kept for compatibility with the upstream extractor internals. The Red Team/Pentest extension is exposed through `profiles/redteam/`, `tools/generate_redteam_skill.py`, and `tools/evaluate_redteam_skill.py`.
 
 ---
 
 ## 📁 Repository structure
 
 ```
-book-to-skill/
+securitybook-to-skill/
 ├── SKILL.md              # Skill definition + step-by-step instructions (the generator spec)
+├── profiles/redteam/     # Red Team/Pentest schema, artifacts, prompts, and benchmark expectations
 ├── scripts/
 │   ├── extract.py        # Thin entrypoint wrapper
 │   └── extractor/        # Modular extraction package
@@ -493,6 +459,8 @@ book-to-skill/
 │       └── parsers/      # Format-specific parsers (pdf, epub, docx, html, rtf, calibre, text)
 ├── tools/
 │   ├── discovery_tax.py  # measures token cost vs context-dump / discovery loop
+│   ├── generate_redteam_skill.py   # Red Team/Pentest artifact generator
+│   ├── evaluate_redteam_skill.py   # Red Team/Pentest quality evaluator
 │   └── validate_skill.py # checks a generated SKILL.md against host rules (--lens claude|copilot|amp)
 ├── tests/                # pytest suite (extraction, detection, discovery tax)
 ├── docs/
@@ -508,7 +476,7 @@ book-to-skill/
 
 ## ⚖️ Copyright & fair use
 
-book-to-skill ships **no book content** — not a single page. It's a converter you point at files you already own.
+securitybook-to-skill ships **no book content** — not a single page. It's a converter you point at files you already own or are authorized to process.
 
 - **Processing is local.** Extraction and analysis run on your machine. Your files are never uploaded by this tool. (If your agent's model runs in the cloud, the text you feed it follows that provider's normal data terms — same as any prompt.)
 - **You use your own copy.** Bring a book you bought, docs your company owns, or papers you have the right to read.
@@ -519,24 +487,6 @@ When in doubt, follow the license or terms of the source document. This project 
 
 ---
 
-## 💖 Sponsors
-
-book-to-skill is free and MIT-licensed, maintained on personal time. If it saves you tokens or study hours, consider sponsoring its upkeep: PR reviews, multilingual fixes, releases, and docs.
-
-**[Become a sponsor → github.com/sponsors/virgiliojr94](https://github.com/sponsors/virgiliojr94)**
-
-Every sponsor is listed in [BACKERS.md](BACKERS.md). Thank you for keeping open, privacy-first tooling alive. ✨
-
 ## License
 
 MIT — applies to the converter (code + skill definition) in this repository, **not** to any book or document you process with it.
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=virgiliojr94%2Fbook-to-skill&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=virgiliojr94/book-to-skill&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=virgiliojr94/book-to-skill&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=virgiliojr94/book-to-skill&type=date&legend=top-left" />
- </picture>
-</a>

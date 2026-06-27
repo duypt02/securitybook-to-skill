@@ -1,8 +1,9 @@
 # Architecture
 
-book-to-skill has two halves: a **deterministic extractor** (Python) and a
-**spec-driven generator** (the agent following `SKILL.md`). The extractor turns any
-document into clean text + metadata; the agent turns that into a structured skill.
+securitybook-to-skill keeps the original **deterministic extractor** (Python) and
+adds a Red Team/Pentest **profile-driven generator**. The extractor turns technical
+documents into clean text + metadata; the Red Team profile turns that into
+source-grounded security artifacts.
 
 ```
             ┌─────────────────────────── EXTRACTOR (Python, deterministic) ──┐
@@ -18,29 +19,30 @@ document into clean text + metadata; the agent turns that into a structured skil
             └────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
-            ┌─────────────────────────── GENERATOR (agent, follows SKILL.md) ┐
-            │  Step 1.5  ask content type → BOOK_TYPE (technical | text)      │
-            │  Step 2/2.5 extract · cost estimate · confirm                   │
-            │  Step 2.6  REPL-style probing for large books (grep/sed, no     │
-            │            full re-reads)                                        │
-            │  Step 3    analyze structure (title, author, chapters, ToC)     │
-            │  Step 4    purpose → DEPTH (reference | study)                   │
-            │  Step 7    per-chapter summaries (budget = BOOK_TYPE × DEPTH)    │
-            │  Step 8    glossary · patterns · cheatsheet (decision layer)    │
-            │  Step 9/9.5 SKILL.md core + indexes                             │
+            ┌──────────────────── RED TEAM PROFILE GENERATOR ────────────────┐
+            │  profiles/redteam/schema.yaml     required fields + safety      │
+            │  profiles/redteam/artifacts.yaml  output artifact contract      │
+            │  profiles/redteam/prompts/        artifact templates            │
+            │  tools/generate_redteam_skill.py  sections, concepts, commands  │
+            │  tools/evaluate_redteam_skill.py  quality + coverage checks     │
             └────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
-                <SKILLS_HOME>/<slug>/  ← chosen per host:
-                  ~/.copilot/skills/   GitHub Copilot CLI
-                  ~/.agents/skills/    Copilot CLI or Amp (cross-agent)
-                  ~/.claude/skills/    Claude Code
-                  .github|.claude|.agents/skills/  project-local
-                  SKILL.md         core frameworks + chapter & topic index (~4K)
-                  chapters/*.md    on-demand, loaded only when asked
-                  glossary.md      terms
-                  patterns.md      techniques
-                  cheatsheet.md    decision rules / trees / trade-offs / tells
+                outputs/<skill-name>/
+                  SKILL.md             main Red Team/Pentest skill
+                  chapters/*.md        source-grounded section files
+                  glossary.md          terms
+                  patterns.md          techniques and procedures
+                  cheatsheet.md        quick reference
+                  checklist.md         testing and assessment checklist
+                  commands.md          commands with context and safety notes
+                  workflows.md         phase-oriented workflows
+                  troubleshooting.md   failure modes and fixes
+                  reporting.md         evidence and finding guidance
+                  safety.md            authorized-use constraints
+                  references.md        source references
+                  coverage.json        benchmark coverage data
+                  citations.json       citation map
 ```
 
 ## Design principles
@@ -66,11 +68,15 @@ document into clean text + metadata; the agent turns that into a structured skil
 | `scripts/extractor/dependencies.py` | optional-dependency probing + `--check` |
 | `tools/discovery_tax.py` | measures token cost vs context-dump / discovery loop |
 | `tools/validate_skill.py` | checks a generated SKILL.md against host rules (`--lens claude|copilot|amp`) |
-| `SKILL.md` | the generator spec (Steps 0–10 + fold-in workflow) |
+| `tools/generate_redteam_skill.py` | generates Red Team/Pentest artifacts from extracted text and metadata |
+| `tools/evaluate_redteam_skill.py` | evaluates required artifacts, schema sections, safety, references, citations, and benchmark coverage |
+| `profiles/redteam/` | Red Team/Pentest schema, artifact contract, prompts, and benchmark expectations |
+| `SKILL.md` | the original generator spec plus the Red Team/Pentest profile mode |
 
 ## Extending
 
 - **New format** → add `parsers/<fmt>.py`, register its extension in `config.py`,
   wire dependency probing in `dependencies.py`, branch in `utils.extract_single_file`.
-- **New generation behavior** → edit the relevant Step in `SKILL.md`; keep it lean
-  and back the change with evidence (see CONTRIBUTING.md).
+- **New Red Team/Pentest behavior** → edit `profiles/redteam/schema.yaml`,
+  `profiles/redteam/artifacts.yaml`, the prompt templates, or the generator/evaluator
+  tools; keep changes backed by benchmark evidence.
