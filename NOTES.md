@@ -250,20 +250,62 @@ extract.py
 
 ---
 
+### Vòng 10 — Harness-first upgrade: shared module, quality gates, profile cleanup
+
+**Vấn đề phát hiện sau chuyển sang harness path:**
+- `evaluate_redteam_skill.py` phụ thuộc trực tiếp vào `generate_redteam_skill.py` → evaluator không thể chạy độc lập.
+- Tests import từ generator → kết nối sai, evaluator không thể tái sử dụng.
+- Evaluator score 100/100 nhưng bỏ qua 4 vấn đề nội dung: Purpose field generic, Source Summary chứa `## heading` artifact từ Docling, nhiều chapter không có command, procedure template giống nhau qua tất cả chapter.
+- `docs/harness/` và `.claude/commands/` chứa 80 dòng workflow lặp lại hoàn toàn từ canonical `.agents/skills/`.
+- `general_redteam` profile không có benchmark → tài liệu generic luôn bị WARN "rubric not configured".
+- `artifacts.yaml` không có `description:` → harness không biết purpose của từng artifact.
+- `classify_knowledge.md` tồn tại nhưng không được reference ở đâu.
+- `knowledge_types` trong `schema.yaml` định nghĩa nhưng không được enforce.
+
+**Thay đổi:**
+51. Tạo `tools/redteam_shared.py` — single source of truth cho `TAXONOMY`, `REQUIRED_GENERATED_ARTIFACTS`, `REQUIRED_SECTION_TITLES`, và các helper functions dùng chung. Evaluator và generator đều import từ đây.
+52. Decouple `evaluate_redteam_skill.py` khỏi `generate_redteam_skill.py`.
+53. Đánh dấu `generate_redteam_skill.py` là **comparison baseline** — không extend thêm, giữ để so sánh chất lượng rule-based vs harness.
+54. Thêm 3 evaluator quality checks mới:
+    - `check_command_purpose_quality`: FAIL nếu `Purpose:` vẫn là "Source-supported command or tool invocation".
+    - `check_source_summary_cleanliness`: FAIL nếu `Source Summary` có bullet bắt đầu bằng `- ## Heading`.
+    - `check_chapter_command_coverage`: WARN nếu >70% chapters không có command.
+55. Mở rộng Step 4 trong canonical SKILL.md với 4 quy tắc bắt buộc cho harness:
+    - Per-chapter command extraction (tìm command trong section của concept đó).
+    - Source Summary formatting (không để markdown heading artifact).
+    - Source-Derived Procedure specificity (reference test case/tool cụ thể từ source).
+    - Command metadata quality (`Purpose` ≥1 câu mô tả accomplishment; `Context of use` ≥25 words).
+56. Giảm `.claude/commands/securitybook-to-skill.md` và `docs/harness/codex-...` thành thin dispatch stubs (từ 88 dòng xuống 15 dòng mỗi file). Xóa `docs/harness/` hoàn toàn (Codex không đọc tự động).
+57. Thêm `general_redteam` benchmark vào `gold_set.json` (min_score 70, min_found_concepts 3, min_command_count 0).
+58. Thêm `description:` cho tất cả 14 artifact trong `artifacts.yaml`.
+59. Sync `generate_commands.md` prompt với các quality rules mới (Purpose, Context min-length).
+60. Comment `knowledge_types` trong `schema.yaml` là documentation-only; xóa `classify_knowledge.md`.
+61. Thêm 4 harness-output integration tests (`@pytest.mark.skipif`) và cập nhật CI với job `evaluate-harness-output`.
+62. Gộp `improve_quality` và `de_xuat_mo_rong_redteam.md` vào `NOTES.md`; xóa 2 file gốc.
+
+**Kết quả:**
+- Tests: **160 passed**.
+- Evaluator bắt được 4 quality issues mà trước đây score 100/100 bỏ qua.
+- `general_redteam` benchmark: tài liệu generic không còn bị WARN về thiếu rubric.
+- Canonical harness: `.agents/skills/securitybook-to-skill/SKILL.md` — các file khác là stubs tham chiếu về canonical.
+
+---
+
 ## 4. Kết quả tổng hợp
 
 ### Điểm chất lượng theo vòng cải thiện (rule-based path)
 
-| Tiêu chí | Ban đầu | Sau vòng 4 | Sau vòng 8 |
-|----------|---------|------------|------------|
-| Artifact completeness | 5/10 | 9/10 | 9/10 |
-| Docling integration | N/A | 8.5/10 | 9/10 |
-| Safety | 6/10 | 9/10 | 9/10 |
-| Traceability/citation | 2/10 | 8/10 | 8.5/10 |
-| Concept selection accuracy | 3/10 | 7.5/10 | 8.3/10 |
-| Command quality | 3/10 | 7/10 | 8.2/10 |
-| Chapter usefulness | 2/10 | 7.5/10 | 8.3/10 |
-| **Overall** | **~3/10** | **~8/10** | **~8.3-8.5/10** |
+| Tiêu chí | Ban đầu | Sau vòng 4 | Sau vòng 8 | Sau vòng 10 |
+|----------|---------|------------|------------|-------------|
+| Artifact completeness | 5/10 | 9/10 | 9/10 | 9/10 |
+| Docling integration | N/A | 8.5/10 | 9/10 | 9/10 |
+| Safety | 6/10 | 9/10 | 9/10 | 9/10 |
+| Traceability/citation | 2/10 | 8/10 | 8.5/10 | 8.5/10 |
+| Concept selection accuracy | 3/10 | 7.5/10 | 8.3/10 | 8.3/10 |
+| Command quality | 3/10 | 7/10 | 8.2/10 | 8.2/10 |
+| Chapter usefulness | 2/10 | 7.5/10 | 8.3/10 | 8.3/10 |
+| Evaluator quality gate rigor | 2/10 | 6/10 | 7/10 | **8.5/10** |
+| **Overall (rule-based)** | **~3/10** | **~8/10** | **~8.3-8.5/10** | **~8.3-8.5/10** |
 
 ### Harness path (Claude Code / Codex direct generation)
 
@@ -280,27 +322,33 @@ Sau khi chuyển sang harness path, output `outputs/redteam-owasp-wstg-docling` 
 |---|-----------|-------|
 | 1 | Bắt buộc Docling cho PDF | `pdftotext` mất cấu trúc: 2 chapters vs 66 chapters với Docling trên PEN200 |
 | 2 | Không promote `weak_mention` thành chapter | Giảm over-match; output ít file hơn nhưng đúng trọng tâm hơn |
-| 3 | Document profile (`owasp_web`, `nist_methodology`, `ai_redteam`, `classic_pentest`) | Mỗi họ tài liệu có taxonomy riêng, tránh lẫn concept không phù hợp |
+| 3 | Document profile (`owasp_web`, `nist_methodology`, `ai_redteam`, `classic_pentest`, `general_redteam`) | Mỗi họ tài liệu có taxonomy riêng, tránh lẫn concept không phù hợp |
 | 4 | Harness sinh trực tiếp từ `full_text.txt` + `metadata.json` | Rule-based generator có giới hạn semantic; Claude Code/Codex tổng hợp prose chất lượng hơn |
 | 5 | `generate_redteam_skill.py` giữ làm comparison baseline | Có giá trị để so sánh chất lượng giữa rule-based và harness output |
 | 6 | `redteam_shared.py` là single source of truth | Tách constants/functions dùng chung để evaluator không phụ thuộc generator |
+| 7 | `.agents/skills/SKILL.md` là canonical harness định nghĩa | Claude Code, Copilot đọc từ đây; `.claude/commands/` và `docs/harness/` là thin stubs |
 
 ---
 
 ## 6. Hạn chế còn lại
 
-- `commands.md` OWASP còn ít command (11) vì source PDF có ít command rõ ràng.
+- `commands.md` OWASP còn ít command (11) vì source PDF có ít command rõ ràng — parser request/code block cần sâu hơn.
 - Một số command có thể chứa credential/lab token từ source — cần redaction layer trước khi chia sẻ rộng.
-- Evaluator keyword/rubric-based, chưa có gold-answer semantic judge.
+- Evaluator vẫn keyword/rubric-based; 3 quality checks mới (vòng 10) cải thiện nhưng chưa có gold-answer semantic judge.
 - Taxonomy chưa bao phủ: wireless pentest, social engineering, adversary emulation, compliance audit.
 - Chưa có merge/ranking đa nguồn khi sinh skill từ nhiều tài liệu lớn cùng lúc.
+- Harness output hiện có (`redteam-owasp-wstg-docling`) sinh trước quality rules mới — cần regenerate để pass `check_command_purpose_quality` và `check_source_summary_cleanliness`.
 
 ---
 
 ## 7. Hướng tiếp theo
 
+- ~~Tách evaluator khỏi generator~~ ✅ done (vòng 10 — `redteam_shared.py`)
+- ~~Thêm quality gate cho command Purpose và Source Summary~~ ✅ done (vòng 10)
+- ~~Thêm `general_redteam` benchmark~~ ✅ done (vòng 10)
+- Regenerate harness output (`redteam-owasp-wstg-docling`) để pass evaluator mới.
 - Thêm secret redaction cho command output từ lab/courseware.
 - Parser request/code block sâu hơn để tăng OWASP command count.
 - Mở rộng gold benchmark cho API, mobile, cloud-native, AD pentest.
 - Thêm gold-answer semantic rubric thay thế keyword matching.
-- So sánh có hệ thống: rule-based vs harness output trên cùng nguồn.
+- So sánh có hệ thống: rule-based vs harness output trên cùng nguồn (đây là lý do giữ generator làm baseline).
