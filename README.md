@@ -215,7 +215,7 @@ Quality caveats for report/demo use:
 - Offensive training material may include lab credentials, tokens, or exploit strings from the source. Production use should add a redaction layer before publishing generated artifacts.
 - OWASP-style web testing documents contain many procedures and payload examples, but fewer standalone terminal commands. Improving request/payload extraction is a future enhancement.
 
-Supporting report notes are kept in `de_xuat_mo_rong_redteam.md` and `improve_quality`.
+Supporting development notes and improvement history are kept in `NOTES.md`.
 
 ---
 
@@ -260,35 +260,8 @@ for the harness.
 |---------|------------|-------|
 | Codex skill | `/skills` then choose `securitybook-to-skill`, or mention `$securitybook-to-skill` | Repo-local skill lives at `.agents/skills/securitybook-to-skill/SKILL.md`. Restart Codex if it does not appear. This is the preferred Codex surface. |
 | Claude Code | `/securitybook-to-skill <source-path> [output-slug]` | Repo-local command lives at `.claude/commands/securitybook-to-skill.md`. Restart Claude Code if it does not appear. |
-| Codex CLI | `/prompts:securitybook-to-skill <source-path> [output-slug]` | Copy `docs/harness/codex-securitybook-to-skill-prompt.md` to `~/.codex/prompts/securitybook-to-skill.md`, then restart Codex. |
 
-Codex note: the recommended Codex surface is the repo-local skill in `.agents/skills/securitybook-to-skill/`. Public Codex docs list custom slash prompts as deprecated and loaded from `~/.codex/prompts`, not from repo-local files. That means the literal repo-local `/securitybook-to-skill` command is available for Claude Code, while Codex should use `/skills`, `$securitybook-to-skill`, or the deprecated `/prompts:securitybook-to-skill` shim if you install it manually.
-
-Use the Codex skill directly:
-
-```text
-$securitybook-to-skill books_test/OWASP_Testing_Guide_v4.pdf redteam-owasp-wstg
-```
-
-If extraction has already been done, call the skill with the extracted pair and
-it will skip extraction and avoid `tools/generate_redteam_skill.py`:
-
-```text
-$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
-```
-
-Install the Codex prompt locally:
-
-```bash
-mkdir -p ~/.codex/prompts
-cp docs/harness/codex-securitybook-to-skill-prompt.md ~/.codex/prompts/securitybook-to-skill.md
-```
-
-Then restart Codex and run:
-
-```text
-/prompts:securitybook-to-skill books_test/OWASP_Testing_Guide_v4.pdf redteam-owasp-wstg
-```
+Codex note: the recommended Codex surface is the repo-local skill in `.agents/skills/securitybook-to-skill/`. Use `/skills` or `$securitybook-to-skill` to invoke it.
 
 ### 1. Check dependencies
 
