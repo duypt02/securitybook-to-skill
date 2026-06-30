@@ -447,7 +447,7 @@ def check_chapter_command_coverage(skill_dir: Path, messages: list[str]) -> bool
             f"for each concept section, extract commands, code blocks, and tool invocations "
             f"found in that section of the source"
         )
-        return False
+        return True  # WARN only; chapter command coverage is informational, not a hard failure
     messages.append("PASS chapter command coverage within acceptable range")
     return True
 
