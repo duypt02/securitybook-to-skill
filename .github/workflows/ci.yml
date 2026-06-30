@@ -88,15 +88,34 @@ jobs:
     name: validate SKILL.md (Claude Code rules)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89ee4e9dddfe3e0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: "3.12"
       - name: Audit SKILL.md against Claude Code skill rules
-        # Fails on Claude-breaking issues (missing name/description, oversized
-        # description, a tool restriction that omits Bash while the skill shells
-        # out). Cross-agent metadata Claude ignores is reported as WARN only.
         run: python3 tools/validate_skill.py SKILL.md
+
+  evaluate-harness-output:
+    name: evaluate harness output (informational)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89ee4e9dddfe3e0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12"
+      - name: Run evaluator on committed harness output
+        # Informational — does not fail CI so a partially-scored output does not
+        # block merges.  Change `|| true` to a hard exit when the output quality
+        # is stable enough to gate on.
+        run: |
+          set -euo pipefail
+          if [ -d "outputs/redteam-owasp-wstg-docling" ]; then
+            python3 tools/evaluate_redteam_skill.py \
+              outputs/redteam-owasp-wstg-docling \
+              --profile profiles/redteam || true
+          else
+            echo "outputs/redteam-owasp-wstg-docling not present; skipping evaluate job"
+          fi
 
   dependency-review:
     name: dependency review (PR)

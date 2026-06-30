@@ -72,7 +72,7 @@ Five paths available. Route based on what the user asks:
 5. Generate the required skill files directly as an agent, preserving source grounding, citation line ranges, command context, and safety constraints.
 6. Run `tools/evaluate_redteam_skill.py` and report the quality findings.
 
-`tools/generate_redteam_skill.py` remains available as a deterministic baseline, prompt-bundle helper, and regression fallback, but the intended high-quality harness flow is direct agent generation from `full_text.txt` and `metadata.json`.
+`tools/generate_redteam_skill.py` is retained as a **comparison baseline** — running both paths on the same source lets you measure the quality difference between deterministic rule-based output and harness-generated output. The intended high-quality harness flow is direct agent generation from `full_text.txt` and `metadata.json`.
 
 **Output:** A Red Team/Pentest skill folder containing the original skill-style files plus profile-specific artifacts: `SKILL.md`, `chapters/`, `glossary.md`, `patterns.md`, `cheatsheet.md`, `checklist.md`, `commands.md`, `workflows.md`, `troubleshooting.md`, `reporting.md`, `safety.md`, `references.md`, `coverage.json`, and `citations.json`.
 

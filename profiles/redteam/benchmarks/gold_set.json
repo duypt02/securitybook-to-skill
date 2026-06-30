@@ -44,6 +44,7 @@
       "required_command_terms": ["curl", "python", "proxychains"]
     },
     "classic_pentest": {
+      "description": "Classic penetration testing courseware — PEN200/OSCP style. Network recon, exploitation, privilege escalation, Active Directory, and post-exploitation.",
       "min_score": 82,
       "min_found_concepts": 18,
       "min_command_count": 25,
@@ -65,6 +66,14 @@
         "final-report"
       ],
       "required_command_terms": ["nmap", "dnsrecon", "nc", "impacket", "curl"]
+    },
+    "general_redteam": {
+      "description": "Fallback profile for lab guides, courseware, and methodology documents that do not map cleanly to a specific domain taxonomy. Thresholds are intentionally lower to accommodate diverse source types.",
+      "min_score": 70,
+      "min_found_concepts": 3,
+      "min_command_count": 0,
+      "required_concepts": ["final-report"],
+      "required_command_terms": []
     }
   }
 }

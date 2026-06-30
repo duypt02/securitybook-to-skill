@@ -59,9 +59,41 @@ If no output slug is provided, derive one from the source filename or folder.
    - Write the required output files directly under `outputs/<output-slug>/`.
    - Create `coverage.json` and `citations.json` manually from the concepts and line ranges you actually used.
    - Do not invent commands, credentials, targets, exploit objectives, citations, or unsupported claims.
-   - Every command must keep context of use, preconditions, expected output, safety note, and source reference.
    - Mark missing details as `not found in source` or `context incomplete`.
    - Preserve authorized-use, scope-control, prohibited-use, and human-oversight constraints.
+
+   **Per-chapter command extraction (required):**
+   For each concept chapter, search the source text *within that concept's section* for
+   commands, code blocks, shell prompts, tool invocations, and example calls. If the
+   section contains them, list them in the chapter's `Related Commands` block and in
+   `commands.md`. Do not copy commands from unrelated sections. If a section genuinely
+   has no commands, state `No commands documented in source for this concept.` — do not
+   write `No source-supported commands detected` as a catch-all.
+
+   **Source Summary formatting (required):**
+   Each bullet in `## Source Summary` must be a clean prose sentence or concise extracted
+   fact. Strip all raw markdown heading markers (`##`, `###`, `####`) from extracted text
+   before writing bullets. Never start a bullet with `- ## Heading Name` or
+   `- ### Sub-heading`. Rewrite the heading as a prose sentence if the information is
+   relevant (e.g. `- The source covers X in section Y.`).
+
+   **Source-Derived Procedure specificity (required):**
+   Steps in `## Source-Derived Procedure` must be derived from the actual test cases,
+   numbered procedures, tool sequences, or methodological steps found in *that concept's
+   section* of the source. Avoid repeating the same generic 6-step template across all
+   chapters. Reference the specific tests, tool names, or numbered steps the source uses.
+   If the source has no procedure for a concept, write a single step:
+   `No explicit procedure documented; treat as reference-only knowledge.`
+
+   **Command metadata quality (required):**
+   - `Purpose:` — one sentence describing *what the command accomplishes* (e.g. "Enumerate
+     open ports on a target host" or "Test for HTTP method support on a web server"). Never
+     write "Source-supported command or tool invocation."
+   - `Context of use:` — state *when, where, and why* this command is used in the
+     assessment workflow. Minimum 25 words. Do not copy a raw sentence fragment from the
+     source that describes output or response, not usage context.
+   - `Expected output:` — describe the expected output if the source provides it; otherwise
+     write `not documented in source`.
 
 5. **Required output contract**
    Write these files before evaluation:

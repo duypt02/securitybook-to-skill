@@ -17,6 +17,10 @@ skill:
     - reporting_notes
     - related_skills
 
+# knowledge_types: classification taxonomy for concept chapter content.
+# Defined here for documentation and harness guidance; not currently enforced
+# by the evaluator. Use these labels when deciding which section of a chapter
+# a piece of source knowledge belongs to.
 knowledge_types:
   conceptual:
     description: "Definitions, principles, concepts, technical background"

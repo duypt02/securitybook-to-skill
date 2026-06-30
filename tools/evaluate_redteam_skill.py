@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 
-from generate_redteam_skill import (
+from redteam_shared import (
     REQUIRED_GENERATED_ARTIFACTS,
     REQUIRED_SECTION_TITLES,
     TAXONOMY,
@@ -338,6 +338,120 @@ def check_commands(skill_dir: Path, messages: list[str]) -> bool:
     return ok
 
 
+GENERIC_PURPOSE_TEXT = "source-supported command or tool invocation"
+GENERIC_CONTEXT_TEXT = {"how to test", "context incomplete"}
+
+
+def check_command_purpose_quality(skill_dir: Path, messages: list[str]) -> bool:
+    """Verify command Purpose and Context fields are not generic template text."""
+    commands_md = skill_dir / "commands.md"
+    if not commands_md.exists():
+        return True  # already caught by check_commands
+    lines = commands_md.read_text(encoding="utf-8", errors="ignore").splitlines()
+    generic_purpose_count = 0
+    weak_context_count = 0
+    total_commands = 0
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("- Command:"):
+            total_commands += 1
+            # Check Purpose on following lines
+            for j in range(i + 1, min(i + 6, len(lines))):
+                if lines[j].startswith("- Purpose:"):
+                    if GENERIC_PURPOSE_TEXT in lines[j].lower():
+                        generic_purpose_count += 1
+                if lines[j].startswith("- Context of use:"):
+                    ctx = lines[j].replace("- Context of use:", "").strip().lower()
+                    if len(ctx) < 20 or ctx in GENERIC_CONTEXT_TEXT:
+                        weak_context_count += 1
+        i += 1
+    if total_commands == 0:
+        return True
+    ok = True
+    if generic_purpose_count > 0:
+        ok = False
+        messages.append(
+            f"FAIL {generic_purpose_count}/{total_commands} commands have generic Purpose text "
+            f"('Source-supported command or tool invocation'); write what the command accomplishes"
+        )
+    else:
+        messages.append("PASS command Purpose fields are specific")
+    if weak_context_count > 0:
+        messages.append(
+            f"WARN {weak_context_count}/{total_commands} commands have weak Context of use "
+            f"(< 20 chars or generic); describe when/where/why the command is used"
+        )
+    else:
+        messages.append("PASS command Context of use fields are meaningful")
+    return ok
+
+
+def check_source_summary_cleanliness(skill_dir: Path, messages: list[str]) -> bool:
+    """Check that chapter source summaries do not contain raw markdown heading artifacts."""
+    chapters_dir = skill_dir / "chapters"
+    if not chapters_dir.is_dir():
+        return True
+    heading_artifact_re = re.compile(r"^- #{1,6} ")
+    dirty_chapters: list[str] = []
+    for chapter in sorted(chapters_dir.glob("*.md")):
+        text = chapter.read_text(encoding="utf-8", errors="ignore")
+        in_source_summary = False
+        for line in text.splitlines():
+            if line.strip() == "## Source Summary":
+                in_source_summary = True
+                continue
+            if line.startswith("## ") and in_source_summary:
+                in_source_summary = False
+            if in_source_summary and heading_artifact_re.match(line):
+                dirty_chapters.append(chapter.name)
+                break
+    if dirty_chapters:
+        messages.append(
+            f"FAIL {len(dirty_chapters)} chapter(s) have raw markdown heading artifacts in "
+            f"Source Summary (e.g. '- ## Section Name'): {', '.join(dirty_chapters)}; "
+            f"strip heading markers and write clean prose bullets"
+        )
+        return False
+    messages.append("PASS source summary cleanliness checks")
+    return True
+
+
+def check_chapter_command_coverage(skill_dir: Path, messages: list[str]) -> bool:
+    """Report per-chapter command coverage; warn when most chapters lack commands."""
+    chapters_dir = skill_dir / "chapters"
+    if not chapters_dir.is_dir():
+        return True
+    chapters = sorted(chapters_dir.glob("*.md"))
+    if not chapters:
+        return True
+    no_commands: list[str] = []
+    for chapter in chapters:
+        text = chapter.read_text(encoding="utf-8", errors="ignore")
+        has_commands = (
+            "```" in text
+            or "- Command:" in text
+            or "no source-supported commands" not in text.lower()
+            and any(c in text for c in ("$", "#!", "nmap", "curl", "python", "nc ", "openssl"))
+        )
+        if not has_commands or "no source-supported commands" in text.lower():
+            no_commands.append(chapter.name)
+    ratio = len(no_commands) / len(chapters)
+    messages.append(
+        f"INFO chapter command coverage: {len(chapters) - len(no_commands)}/{len(chapters)} "
+        f"chapters contain commands"
+    )
+    if ratio > 0.7:
+        messages.append(
+            f"WARN {len(no_commands)}/{len(chapters)} chapters have no commands; "
+            f"for each concept section, extract commands, code blocks, and tool invocations "
+            f"found in that section of the source"
+        )
+        return False
+    messages.append("PASS chapter command coverage within acceptable range")
+    return True
+
+
 def check_safety(skill_dir: Path, messages: list[str]) -> bool:
     safety_md = skill_dir / "safety.md"
     if not safety_md.exists():
@@ -438,6 +552,9 @@ def evaluate(skill_dir: Path, profile_dir: Path, source_path: Path | None = None
         check_chapter_substance(skill_dir, messages),
         check_semantic_alignment(skill_dir, messages),
         check_commands(skill_dir, messages),
+        check_command_purpose_quality(skill_dir, messages),
+        check_source_summary_cleanliness(skill_dir, messages),
+        check_chapter_command_coverage(skill_dir, messages),
         check_safety(skill_dir, messages),
         check_rubric(skill_dir, profile_dir, messages),
     ]

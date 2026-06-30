@@ -2,49 +2,98 @@ artifacts:
   - name: SKILL.md
     prompt: generate_skill.md
     required: true
+    description: >
+      Master skill summary — objectives, preconditions, procedure, tools,
+      safety constraints, and references in one navigable document.
 
   - name: chapters
     required: true
+    description: >
+      Per-concept chapters derived from source sections. Each chapter must contain:
+      Source Summary (clean prose bullets), Source-Derived Procedure (concept-specific
+      steps), Evidence To Collect, Reporting Notes, Decision Points, Safety Constraints,
+      Related Commands, and Citation.
 
   - name: glossary.md
     required: true
+    description: >
+      Source-derived glossary of technical terms, acronyms, tool names, and
+      definitions found in the source. Do not invent definitions not present in source.
 
   - name: patterns.md
     required: true
+    description: >
+      Reusable attack patterns, test patterns, and methodology patterns extracted
+      from the source. Each pattern should include preconditions and expected outcome.
 
   - name: cheatsheet.md
     required: true
+    description: >
+      Quick-reference card of commands, techniques, and tool invocations for
+      authorized use. Derived from commands.md and chapter commands.
 
   - name: checklist.md
     prompt: generate_checklist.md
     required: true
+    description: >
+      Pre-engagement, execution, evidence capture, reporting, and stop-condition
+      checklist. Must include scope/authorization verification as first section.
 
   - name: commands.md
     prompt: generate_commands.md
     required: true
+    description: >
+      Annotated command reference. Each entry requires: Command, Purpose (what it
+      accomplishes — not generic), Context of use (when/where/why, min 25 words),
+      Preconditions, Required inputs, Important parameters, Expected output,
+      Common errors, Safety note, and Source reference.
 
   - name: workflows.md
     prompt: generate_workflows.md
     required: true
+    description: >
+      Step-by-step workflows connecting multiple concepts for a complete assessment
+      phase. Each workflow must have a goal, scope assumptions, inputs, ordered steps,
+      decision points, expected outputs, safety controls, and source reference.
 
   - name: troubleshooting.md
     prompt: generate_troubleshooting.md
     required: true
+    description: >
+      Common failure modes, error messages, tool errors, and diagnostic steps
+      derived from the source. Include what to check and how to recover.
 
   - name: reporting.md
     prompt: generate_reporting.md
     required: true
+    description: >
+      Evidence templates, finding structure, severity guidance, and report
+      narrative guidance derived from the source.
 
   - name: safety.md
     prompt: generate_safety.md
     required: true
+    description: >
+      Authorized-use constraints, prohibited use, scope control, data handling,
+      and human-oversight requirements. Must include: intended use, authorized
+      environments, prohibited use, and human oversight section.
 
   - name: references.md
     prompt: generate_references.md
     required: true
+    description: >
+      Source citations, related standards, tool documentation links, and further
+      reading derived from or referenced by the source document.
 
   - name: coverage.json
     required: true
+    description: >
+      Machine-readable concept coverage map. Fields: skill_name, document_profile,
+      taxonomy_total, found_concepts (list with key/name/category/confidence),
+      weak_references, taxonomy.
 
   - name: citations.json
     required: true
+    description: >
+      Source citation index. Fields: citations (list with id, concept_key,
+      source_file, line_start, line_end, confidence, excerpt).

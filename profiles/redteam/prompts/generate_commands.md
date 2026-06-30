@@ -24,3 +24,17 @@ Rules:
 - Do not present the output as instructions for unauthorized activity.
 - Assume all usage is for lab, education, defense, or authorized testing.
 - If the source lacks enough context for a command, mark it as "context incomplete".
+
+Quality requirements:
+- `Purpose:` must be one sentence describing *what the command accomplishes*
+  (e.g. "Enumerate open ports on a target host", "Test whether the server
+  reveals version information via a malformed HTTP request"). Never write
+  "Source-supported command or tool invocation."
+- `Context of use:` must explain *when, where, and why* the command is used
+  in the assessment workflow. Write at least 25 words. Do not copy a raw
+  sentence fragment from the source that describes output or response — describe
+  the usage context instead.
+- `Expected output:` describe the expected output if the source provides it;
+  otherwise write `not documented in source`.
+- Search for commands within *each concept's section* of the source. Do not
+  aggregate commands from unrelated sections into a single concept's block.
