@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 from textwrap import shorten
 
@@ -633,6 +634,24 @@ REQUIRED_GENERATED_ARTIFACTS = [
     "coverage.json",
     "citations.json",
 ]
+AGENT_MODES = {"rule", "agent", "hybrid"}
+AGENT_PROVIDERS = {"mock", "manual"}
+AGENT_ARTIFACTS = {
+    "SKILL.md",
+    "checklist.md",
+    "commands.md",
+    "workflows.md",
+    "troubleshooting.md",
+    "reporting.md",
+    "safety.md",
+    "references.md",
+}
+SENSITIVE_SOURCE_PATTERNS = (
+    re.compile(r"(?i)\b(api[_-]?key|access[_-]?token|secret|password|passwd|pwd)\b\s*[:=]\s*['\"]?[^'\"\s]{6,}"),
+    re.compile(r"(?i)\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
+    re.compile(r"(?i)\b[a-z0-9._%+-]+:[^@\s]{6,}@[a-z0-9.-]+\b"),
+    re.compile(r"(?i)\b(?:bearer|token)\s+[a-z0-9._~+/=-]{12,}\b"),
+)
 
 
 def slugify(value: str) -> str:
@@ -747,6 +766,159 @@ def load_prompts(profile_dir: Path, artifacts: list[dict]) -> dict[str, str]:
     if classifier.exists():
         prompts[classifier.name] = read_text(classifier)
     return prompts
+
+
+def artifact_prompt_map(artifacts: list[dict]) -> dict[str, str]:
+    return {
+        str(artifact["name"]): str(artifact["prompt"])
+        for artifact in artifacts
+        if isinstance(artifact, dict) and artifact.get("name") and artifact.get("prompt")
+    }
+
+
+def source_context_for_prompt(context: dict, artifact_name: str) -> str:
+    chunks = context.get("chunks", [])
+    commands = context.get("commands", [])
+    lines = [
+        f"Skill name: {context.get('skill_name', 'Red Team/Pentest Skill')}",
+        f"Document profile: {context.get('document_profile', 'unknown')}",
+        "Sources:",
+        *[f"- {source}" for source in context.get("sources", [])],
+        "Source markers:",
+        *[f"- {marker}" for marker in context.get("markers", [])[:12]],
+        "Detected source sections:",
+    ]
+    for chunk in chunks[:16]:
+        lines.append(
+            f"- {chunk['name']} ({chunk['category']}), citation `{chunk['id']}`, "
+            f"lines {chunk['start_line']}-{chunk['end_line']}, confidence {chunk['confidence']}"
+        )
+        for excerpt in chunk.get("excerpt", [])[:4]:
+            lines.append(f"  - {excerpt}")
+    if artifact_name == "commands.md" or commands:
+        lines.append("Source-supported commands:")
+        if commands:
+            for item in commands[:24]:
+                lines.append(f"- `{item['command']}` | {item['context']} | {item['source']}")
+        else:
+            lines.append("- Not found in source.")
+    return "\n".join(lines).strip() + "\n"
+
+
+def render_prompt(
+    artifact_name: str,
+    template: str,
+    context: dict,
+    schema: dict,
+    metadata: dict,
+    revision_feedback: list[str] | None = None,
+) -> str:
+    required_fields = schema.get("skill", {}).get("required_fields", [])
+    required_titles = [REQUIRED_SECTION_TITLES.get(field, str(field).replace("_", " ").title()) for field in required_fields]
+    safety_rules = [
+        "Use only the provided source content for technical claims.",
+        "Do not invent targets, credentials, exploit objectives, or commands.",
+        "Commands require context, preconditions, expected output, safety note, and source reference.",
+        "If a detail is missing, write `not found in source` or `context incomplete`.",
+        "Frame all usage for lab, education, defense, or explicitly authorized testing.",
+    ]
+    payload = {
+        "artifact_name": artifact_name,
+        "template": template.strip(),
+        "schema_required_sections": required_titles,
+        "safety_constraints": safety_rules,
+        "source_context": source_context_for_prompt(context, artifact_name),
+        "metadata": {
+            "sources": context.get("sources", []),
+            "document_profile": context.get("document_profile"),
+            "source_metadata": metadata,
+        },
+        "revision_feedback": revision_feedback or [],
+    }
+    feedback_block = ""
+    if revision_feedback:
+        feedback_block = "\nRevision feedback:\n" + "\n".join(f"- {item}" for item in revision_feedback) + "\n"
+    return f"""# Agent Artifact Prompt: {artifact_name}
+
+{template.strip()}
+
+Schema required sections:
+{bullets(required_titles, "No schema required sections configured.")}
+Safety constraints:
+{bullets(safety_rules, "No safety constraints configured.")}
+Source context:
+{payload["source_context"]}
+Metadata:
+```json
+{json.dumps(payload["metadata"], indent=2, ensure_ascii=False)}
+```
+{feedback_block}
+Return only Markdown for `{artifact_name}`. Keep every technical detail source-grounded.
+"""
+
+
+class AgentProvider(ABC):
+    name = "base"
+
+    @abstractmethod
+    def generate(
+        self,
+        artifact_name: str,
+        prompt: str,
+        source_context: dict,
+        schema: dict,
+        metadata: dict,
+    ) -> str:
+        """Generate one artifact from a rendered prompt."""
+
+
+class MockAgentProvider(AgentProvider):
+    name = "mock"
+
+    def generate(
+        self,
+        artifact_name: str,
+        prompt: str,
+        source_context: dict,
+        schema: dict,
+        metadata: dict,
+    ) -> str:
+        renderer = RENDERERS.get(artifact_name)
+        if renderer is None:
+            return f"# {artifact_name}\n\nnot found in source\n"
+        return renderer(source_context)
+
+
+class ManualAgentProvider(AgentProvider):
+    name = "manual"
+
+    def __init__(self, run_dir: Path):
+        self.run_dir = run_dir
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+
+    def generate(
+        self,
+        artifact_name: str,
+        prompt: str,
+        source_context: dict,
+        schema: dict,
+        metadata: dict,
+    ) -> str:
+        safe_name = artifact_name.replace("/", "__")
+        bundle_path = self.run_dir / f"{safe_name}.prompt.md"
+        bundle_path.write_text(prompt.rstrip() + "\n", encoding="utf-8")
+        renderer = RENDERERS.get(artifact_name)
+        if renderer is None:
+            return f"# {artifact_name}\n\nManual provider prompt written to `{bundle_path.name}`.\n"
+        return renderer(source_context)
+
+
+def build_provider(provider_name: str, out_dir: Path) -> AgentProvider:
+    if provider_name == "mock":
+        return MockAgentProvider()
+    if provider_name == "manual":
+        return ManualAgentProvider(out_dir / "prompt_runs")
+    raise ValueError(f"Unsupported provider: {provider_name}")
 
 
 def source_name(metadata: dict, out_dir: Path) -> str:
@@ -1830,6 +2002,101 @@ def citations_payload(context: dict) -> dict:
     }
 
 
+def has_sensitive_source_material(text: str) -> bool:
+    return any(pattern.search(text) for pattern in SENSITIVE_SOURCE_PATTERNS)
+
+
+def required_skill_headings(schema: dict) -> list[str]:
+    fields = schema.get("skill", {}).get("required_fields", [])
+    return [REQUIRED_SECTION_TITLES.get(field, str(field).replace("_", " ").title()) for field in fields]
+
+
+def ensure_heading(text: str, heading: str, fallback: str = "not found in source") -> str:
+    if re.search(rf"^##\s+{re.escape(heading)}\s*$", text, flags=re.MULTILINE):
+        return text
+    return text.rstrip() + f"\n\n## {heading}\n{fallback}\n"
+
+
+def post_process_agent_markdown(artifact_name: str, text: str, context: dict, schema: dict) -> str:
+    cleaned = text.strip()
+    if not cleaned:
+        cleaned = f"# {artifact_name}\n\nnot found in source"
+    if not cleaned.startswith("#"):
+        title = artifact_name.removesuffix(".md").replace("_", " ").replace("-", " ").title()
+        cleaned = f"# {title}\n\n{cleaned}"
+    if artifact_name == "SKILL.md":
+        for heading in required_skill_headings(schema):
+            cleaned = ensure_heading(cleaned, heading)
+    if artifact_name == "commands.md":
+        lowered = cleaned.lower()
+        if "context of use" not in lowered:
+            cleaned = ensure_heading(cleaned, "Command Context", "Context of use: context incomplete")
+        if "safety note" not in lowered:
+            cleaned = ensure_heading(cleaned, "Command Safety", "Safety note: Authorized-use only.")
+    if artifact_name == "safety.md":
+        for heading, fallback in (
+            ("Intended Use", "Authorized education, research, defense, lab, and approved testing only."),
+            ("Authorized Environments", "Lab, training, owned, defense, or explicitly approved environments only."),
+            ("Prohibited Use", "Prohibited without explicit permission or outside approved scope."),
+            ("Scope Control", "Stop when scope or authorization is unclear."),
+            ("Human Oversight", "Human oversight is required before operational use."),
+        ):
+            cleaned = ensure_heading(cleaned, heading, fallback)
+    if "authorized" not in cleaned.lower() and artifact_name in {"SKILL.md", "commands.md", "workflows.md", "safety.md"}:
+        cleaned += "\n\n## Authorized-Use Notice\nAll use requires explicit authorization and controlled scope.\n"
+    return cleaned.rstrip() + "\n"
+
+
+def write_quality_outputs(
+    out_dir: Path,
+    ok: bool,
+    messages: list[str],
+    context: dict,
+    mode: str,
+    provider: str,
+    revisions_run: int,
+    sensitive_source_material: bool,
+) -> list[Path]:
+    evaluation = {
+        "ok": ok,
+        "mode": mode,
+        "provider": provider,
+        "revisions_run": revisions_run,
+        "messages": messages,
+    }
+    evaluation_path = out_dir / "evaluation.json"
+    evaluation_path.write_text(json.dumps(evaluation, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    status = "PASS" if ok else "FAIL"
+    sensitive_line = "true" if sensitive_source_material else "false"
+    report_lines = [
+        "# Red Team/Pentest Quality Report",
+        "",
+        f"- Result: {status}",
+        f"- Mode: {mode}",
+        f"- Provider: {provider}",
+        f"- Revisions run: {revisions_run}",
+        f"- sensitive_source_material: {sensitive_line}",
+        f"- Found concepts: {len(context.get('chunks', []))}",
+        f"- Commands: {len(context.get('commands', []))}",
+        "",
+        "## Evaluator Messages",
+        *[f"- {message}" for message in messages],
+    ]
+    if sensitive_source_material:
+        report_lines.extend(
+            [
+                "",
+                "## Sensitive Source Material",
+                "- Potential credentials, tokens, passwords, or lab secrets were detected in the source.",
+                "- Review and redact generated artifacts before publishing or sharing outside the approved environment.",
+            ]
+        )
+    report_path = out_dir / "quality_report.md"
+    report_path.write_text("\n".join(report_lines).rstrip() + "\n", encoding="utf-8")
+    return [evaluation_path, report_path]
+
+
 def build_context(full_text: str, metadata: dict, profile_dir: Path, out_dir: Path, schema: dict, allow_non_docling: bool = False) -> dict:
     validate_docling_requirement(metadata, allow_non_docling=allow_non_docling)
     required_fields = schema.get("skill", {}).get("required_fields", [])
@@ -1883,8 +2150,15 @@ RENDERERS = {
 }
 
 
-def write_generated_artifacts(context: dict, out_dir: Path) -> list[Path]:
+def write_generated_artifacts(
+    context: dict,
+    out_dir: Path,
+    generated_markdown: dict[str, str] | None = None,
+    schema: dict | None = None,
+) -> list[Path]:
     written = []
+    generated_markdown = generated_markdown or {}
+    schema = schema or {}
     out_dir.mkdir(parents=True, exist_ok=True)
 
     chapters_dir = out_dir / "chapters"
@@ -1901,7 +2175,12 @@ def write_generated_artifacts(context: dict, out_dir: Path) -> list[Path]:
 
     for name, renderer in RENDERERS.items():
         target = out_dir / name
-        target.write_text(renderer(context).rstrip() + "\n", encoding="utf-8")
+        content = generated_markdown.get(name)
+        if content is None:
+            content = renderer(context)
+        else:
+            content = post_process_agent_markdown(name, content, context, schema)
+        target.write_text(content.rstrip() + "\n", encoding="utf-8")
         written.append(target)
 
     coverage_path = out_dir / "coverage.json"
@@ -1914,18 +2193,130 @@ def write_generated_artifacts(context: dict, out_dir: Path) -> list[Path]:
     return written
 
 
-def generate(full_text_path: Path, metadata_path: Path, profile_dir: Path, out_dir: Path, allow_non_docling: bool = False) -> list[Path]:
+def write_prompt_bundles(
+    out_dir: Path,
+    artifacts: list[dict],
+    prompts: dict[str, str],
+    context: dict,
+    schema: dict,
+    metadata: dict,
+    revision_feedback: list[str] | None = None,
+) -> list[Path]:
+    run_dir = out_dir / "prompt_runs"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for artifact_name, prompt_name in artifact_prompt_map(artifacts).items():
+        template = prompts[prompt_name]
+        rendered = render_prompt(artifact_name, template, context, schema, metadata, revision_feedback=revision_feedback)
+        path = run_dir / f"{artifact_name.replace('/', '__')}.prompt.md"
+        path.write_text(rendered.rstrip() + "\n", encoding="utf-8")
+        written.append(path)
+    manifest_path = run_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "mode": "dry-run-prompts",
+                "artifacts": [path.name for path in written],
+                "provider_contract": {
+                    "inputs": ["artifact_name", "prompt", "source_context", "schema", "metadata"],
+                    "output": "markdown",
+                },
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    written.append(manifest_path)
+    return written
+
+
+def generate_agent_markdown(
+    artifacts: list[dict],
+    prompts: dict[str, str],
+    context: dict,
+    schema: dict,
+    metadata: dict,
+    provider: AgentProvider,
+    revision_feedback: list[str] | None = None,
+) -> dict[str, str]:
+    outputs = {}
+    prompt_names = artifact_prompt_map(artifacts)
+    for artifact_name in sorted(AGENT_ARTIFACTS & set(prompt_names)):
+        template = prompts[prompt_names[artifact_name]]
+        rendered = render_prompt(artifact_name, template, context, schema, metadata, revision_feedback=revision_feedback)
+        outputs[artifact_name] = provider.generate(artifact_name, rendered, context, schema, metadata)
+    return outputs
+
+
+def evaluate_outputs(out_dir: Path, profile_dir: Path, full_text_path: Path, metadata_path: Path) -> tuple[bool, list[str]]:
+    from evaluate_redteam_skill import evaluate
+
+    return evaluate(out_dir, profile_dir, source_path=full_text_path, metadata_path=metadata_path)
+
+
+def generate(
+    full_text_path: Path,
+    metadata_path: Path,
+    profile_dir: Path,
+    out_dir: Path,
+    allow_non_docling: bool = False,
+    mode: str = "hybrid",
+    provider_name: str = "mock",
+    max_revisions: int = 1,
+    dry_run_prompts: bool = False,
+) -> list[Path]:
+    if mode not in AGENT_MODES:
+        raise ValueError(f"Unsupported mode: {mode}")
+    if provider_name not in AGENT_PROVIDERS:
+        raise ValueError(f"Unsupported provider: {provider_name}")
     schema = load_profile_yaml(profile_dir / "schema.yaml")
     artifacts_config = load_profile_yaml(profile_dir / "artifacts.yaml")
     artifacts = artifacts_config.get("artifacts", [])
     if not isinstance(artifacts, list) or not artifacts:
         raise ValueError(f"No artifacts configured in {profile_dir / 'artifacts.yaml'}")
-    load_prompts(profile_dir, artifacts)
+    prompts = load_prompts(profile_dir, artifacts)
 
     full_text = read_text(full_text_path)
     metadata = json.loads(read_text(metadata_path))
     context = build_context(full_text, metadata, profile_dir, out_dir, schema, allow_non_docling=allow_non_docling)
-    return write_generated_artifacts(context, out_dir)
+    if dry_run_prompts:
+        return write_prompt_bundles(out_dir, artifacts, prompts, context, schema, metadata)
+
+    provider = build_provider(provider_name, out_dir)
+    generated_markdown = {}
+    if mode in {"agent", "hybrid"}:
+        generated_markdown = generate_agent_markdown(artifacts, prompts, context, schema, metadata, provider)
+
+    written = write_generated_artifacts(context, out_dir, generated_markdown=generated_markdown, schema=schema)
+    ok, messages = evaluate_outputs(out_dir, profile_dir, full_text_path, metadata_path)
+    revisions_run = 0
+    while not ok and revisions_run < max(0, max_revisions) and mode in {"agent", "hybrid"}:
+        revisions_run += 1
+        feedback = [message for message in messages if message.startswith(("FAIL", "WARN"))]
+        generated_markdown = generate_agent_markdown(
+            artifacts,
+            prompts,
+            context,
+            schema,
+            metadata,
+            provider,
+            revision_feedback=feedback,
+        )
+        written = write_generated_artifacts(context, out_dir, generated_markdown=generated_markdown, schema=schema)
+        ok, messages = evaluate_outputs(out_dir, profile_dir, full_text_path, metadata_path)
+
+    quality_paths = write_quality_outputs(
+        out_dir,
+        ok,
+        messages,
+        context,
+        mode,
+        provider_name,
+        revisions_run,
+        has_sensitive_source_material(full_text),
+    )
+    return written + quality_paths
 
 
 def main() -> int:
@@ -1935,10 +2326,25 @@ def main() -> int:
     parser.add_argument("--profile", type=Path, default=Path("profiles/redteam"), help="Profile directory")
     parser.add_argument("--out", type=Path, required=True, help="Output skill directory")
     parser.add_argument("--allow-non-docling", action="store_true", help="Allow non-Docling metadata for synthetic tests only")
+    parser.add_argument("--mode", choices=sorted(AGENT_MODES), default="hybrid", help="Generation mode")
+    parser.add_argument("--provider", choices=sorted(AGENT_PROVIDERS), default="mock", help="Agent provider")
+    parser.add_argument("--max-revisions", type=int, default=1, help="Maximum evaluator feedback revisions")
+    parser.add_argument("--dry-run-prompts", action="store_true", help="Render prompt bundles only; do not generate artifacts")
     args = parser.parse_args()
 
-    written = generate(args.full_text, args.metadata, args.profile, args.out, allow_non_docling=args.allow_non_docling)
-    print(f"Generated {len(written)} Red Team/Pentest artifact(s) in {args.out}")
+    written = generate(
+        args.full_text,
+        args.metadata,
+        args.profile,
+        args.out,
+        allow_non_docling=args.allow_non_docling,
+        mode=args.mode,
+        provider_name=args.provider,
+        max_revisions=args.max_revisions,
+        dry_run_prompts=args.dry_run_prompts,
+    )
+    action = "Rendered" if args.dry_run_prompts else "Generated"
+    print(f"{action} {len(written)} Red Team/Pentest artifact(s) in {args.out}")
     for path in written:
         print(f"- {path}")
     return 0

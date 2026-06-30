@@ -7,15 +7,23 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from evaluate_redteam_skill import evaluate
-from generate_redteam_skill import build_context, build_chunks, extract_commands, extract_known_concepts, generate, load_profile_yaml, sanitize_command
+from generate_redteam_skill import (
+    MockAgentProvider,
+    build_context,
+    build_chunks,
+    extract_commands,
+    extract_known_concepts,
+    generate,
+    load_profile_yaml,
+    load_prompts,
+    render_prompt,
+    sanitize_command,
+)
 
 
-def test_generate_and_evaluate_redteam_skill(tmp_path):
+def write_lab_fixture(tmp_path):
     full_text = tmp_path / "full_text.txt"
     metadata = tmp_path / "metadata.json"
-    out_dir = tmp_path / "outputs" / "lab-skill"
-    profile_dir = ROOT_DIR / "profiles" / "redteam"
-
     full_text.write_text(
         "\n".join(
             [
@@ -52,6 +60,13 @@ def test_generate_and_evaluate_redteam_skill(tmp_path):
         ),
         encoding="utf-8",
     )
+    return full_text, metadata
+
+
+def test_generate_and_evaluate_redteam_skill(tmp_path):
+    full_text, metadata = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "lab-skill"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
 
     written = generate(full_text, metadata, profile_dir, out_dir)
 
@@ -72,6 +87,8 @@ def test_generate_and_evaluate_redteam_skill(tmp_path):
         "references.md",
         "coverage.json",
         "citations.json",
+        "evaluation.json",
+        "quality_report.md",
     }.issubset({path.name for path in written})
 
     commands = (out_dir / "commands.md").read_text(encoding="utf-8")
@@ -83,6 +100,113 @@ def test_generate_and_evaluate_redteam_skill(tmp_path):
 
     ok, messages = evaluate(out_dir, profile_dir, source_path=full_text, metadata_path=metadata)
     assert ok, "\n".join(messages)
+
+
+def test_prompt_render_includes_artifact_schema_source_and_safety(tmp_path):
+    full_text, metadata_path = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "prompt-render"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
+    schema = load_profile_yaml(profile_dir / "schema.yaml")
+    artifacts = load_profile_yaml(profile_dir / "artifacts.yaml")["artifacts"]
+    prompts = load_prompts(profile_dir, artifacts)
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    context = build_context(full_text.read_text(encoding="utf-8"), metadata, profile_dir, out_dir, schema)
+
+    rendered = render_prompt("commands.md", prompts["generate_commands.md"], context, schema, metadata)
+
+    assert "Agent Artifact Prompt: commands.md" in rendered
+    assert "Context of use" in rendered
+    assert "Skill Name" in rendered
+    assert "Do not invent targets" in rendered
+    assert "nmap -sV 192.0.2.10" in rendered
+
+
+def test_mock_provider_returns_deterministic_artifact(tmp_path):
+    full_text, metadata_path = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "mock-provider"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
+    schema = load_profile_yaml(profile_dir / "schema.yaml")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    context = build_context(full_text.read_text(encoding="utf-8"), metadata, profile_dir, out_dir, schema)
+    provider = MockAgentProvider()
+
+    first = provider.generate("commands.md", "prompt", context, schema, metadata)
+    second = provider.generate("commands.md", "prompt", context, schema, metadata)
+
+    assert first == second
+    assert "Context of use:" in first
+    assert "Safety note:" in first
+
+
+def test_dry_run_prompts_writes_prompt_bundles_only(tmp_path):
+    full_text, metadata = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "dry-run"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
+
+    written = generate(
+        full_text,
+        metadata,
+        profile_dir,
+        out_dir,
+        mode="agent",
+        provider_name="manual",
+        dry_run_prompts=True,
+    )
+
+    names = {path.name for path in written}
+    assert "commands.md.prompt.md" in names
+    assert "manifest.json" in names
+    assert (out_dir / "prompt_runs" / "SKILL.md.prompt.md").exists()
+    assert not (out_dir / "SKILL.md").exists()
+
+
+def test_rule_mode_keeps_existing_output_contract(tmp_path):
+    full_text, metadata = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "rule-mode"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
+
+    generate(full_text, metadata, profile_dir, out_dir, mode="rule", provider_name="mock", max_revisions=1)
+
+    evaluation = json.loads((out_dir / "evaluation.json").read_text(encoding="utf-8"))
+    assert evaluation["mode"] == "rule"
+    assert evaluation["revisions_run"] == 0
+    assert (out_dir / "commands.md").exists()
+    assert not (out_dir / "prompt_runs").exists()
+
+
+def test_hybrid_mode_generates_required_artifacts_and_quality_report(tmp_path):
+    full_text, metadata = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "hybrid-mode"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
+
+    generate(full_text, metadata, profile_dir, out_dir, mode="hybrid", provider_name="mock")
+
+    assert (out_dir / "SKILL.md").exists()
+    assert (out_dir / "commands.md").exists()
+    assert (out_dir / "safety.md").exists()
+    assert (out_dir / "coverage.json").exists()
+    report = (out_dir / "quality_report.md").read_text(encoding="utf-8")
+    assert "- Result: PASS" in report
+
+
+def test_revision_loop_is_capped(tmp_path, monkeypatch):
+    full_text, metadata = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "revision-cap"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
+    calls = {"count": 0}
+
+    def always_fail(out_dir, profile_dir, full_text_path, metadata_path):
+        calls["count"] += 1
+        return False, ["FAIL forced evaluator failure"]
+
+    monkeypatch.setattr("generate_redteam_skill.evaluate_outputs", always_fail)
+
+    generate(full_text, metadata, profile_dir, out_dir, mode="hybrid", provider_name="mock", max_revisions=1)
+
+    evaluation = json.loads((out_dir / "evaluation.json").read_text(encoding="utf-8"))
+    assert calls["count"] == 2
+    assert evaluation["revisions_run"] == 1
+    assert not evaluation["ok"]
 
 
 def test_redteam_generation_requires_docling_for_pdf_metadata(tmp_path):

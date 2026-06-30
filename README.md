@@ -36,11 +36,12 @@
   <strong>Prototype focus:</strong> Red Team/Pentest Skill artifacts from OWASP, NIST, OFFSEC, PEN200, AI Red Teaming, and similar technical security documents.
 </p>
 
-**How it works, in 3 steps:**
+**How it works, in 2 phases:**
 
-1. **Extract** the document with Docling-aware technical mode — `python3 scripts/extract.py ./books_test/source.pdf --mode technical --no-install-missing`
-2. **Generate** Red Team artifacts — `tools/generate_redteam_skill.py` loads `profiles/redteam/schema.yaml`, `artifacts.yaml`, and prompt templates.
-3. **Evaluate** quality — `tools/evaluate_redteam_skill.py` checks required files, schema sections, command context, safety constraints, references, citations, and benchmark coverage.
+1. **Phase 1 — Generate skills from source documents.** This is the focus of `securitybook-to-skill`: extract source text, build source-grounded Red Team/Pentest artifacts, preserve citations, and evaluate quality.
+2. **Phase 2 — Use generated skills in Codex, Claude Code, or another compatible agent.** Copy or install the generated skill folder into that agent's skill directory, then invoke it during work.
+
+The tool in this repository is primarily a **Phase 1 generator**. Phase 2 is documented so you know where the generated output goes, but the core value is compiling technical security documents into reusable skills.
 
 ---
 
@@ -106,25 +107,90 @@ The Red Team generator writes the standard book-to-skill files plus Red Team-spe
 | `references.md` | Source references and citation map |
 | `coverage.json`, `citations.json` | Machine-readable evaluation metadata |
 
-### Demo workflow
+### Phase 1 Demo: Generate a Skill
 
 Use Docling for technical PDFs so tables, code blocks, and document structure are preserved:
 
 ```bash
+# 1. Extract source text and metadata
 python3 scripts/extract.py books_test/OWASP_Testing_Guide_v4.pdf --mode technical --no-install-missing
 
-python3 tools/generate_redteam_skill.py \
-  /tmp/book_skill_work/full_text.txt \
-  /tmp/book_skill_work/metadata.json \
-  --profile profiles/redteam \
-  --out outputs/redteam-owasp-wstg-docling
+# 2. Ask Codex or Claude Code to generate artifacts directly from:
+#    /tmp/book_skill_work/full_text.txt
+#    /tmp/book_skill_work/metadata.json
 
+# 3. Evaluate after artifacts are written
 python3 tools/evaluate_redteam_skill.py \
   outputs/redteam-owasp-wstg-docling \
   --profile profiles/redteam \
   --source /tmp/book_skill_work/full_text.txt \
   --metadata /tmp/book_skill_work/metadata.json
 ```
+
+The result of Phase 1 is a complete generated skill folder under `outputs/<skill-name>/`.
+
+### Phase 2 Preview: Use the Generated Skill
+
+After Phase 1, copy the generated folder into the skill location for your agent:
+
+| Agent | Typical personal skill directory | Project-local skill directory |
+|-------|----------------------------------|-------------------------------|
+| Codex | `~/.agents/skills/` | `.agents/skills/` |
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| GitHub Copilot CLI | `~/.copilot/skills/` or `~/.agents/skills/` | `.github/skills/` or `.agents/skills/` |
+| Amp | `~/.agents/skills/` or `~/.config/agents/skills/` | `.agents/skills/` |
+
+Example for Codex project-local usage:
+
+```bash
+mkdir -p .agents/skills
+cp -R outputs/redteam-owasp-wstg-docling .agents/skills/redteam-owasp-wstg
+```
+
+Then restart/open Codex in this repo and ask it to use the generated skill by name.
+
+### Agent runtime upgrade
+
+The Red Team helper script still supports three generation modes, but it is not
+the preferred quality path when a capable harness such as Codex or Claude Code is
+available:
+
+| Mode | Behavior |
+|------|----------|
+| `--mode rule` | Preserves the original deterministic Python generator contract. |
+| `--mode agent` | Renders profile prompts for artifact generation. Useful when you want prompt bundles instead of direct agent generation. |
+| `--mode hybrid` | Python extracts sections, concepts, commands, citations, coverage, and safety checks; a provider supplies artifact Markdown. Use this for fallback/demo runs, not as the preferred quality path. |
+
+Providers are intentionally local by default:
+
+| Provider | Purpose |
+|----------|---------|
+| `--provider mock` | Deterministic fallback used by tests and demos; no API key or network access required. |
+| `--provider manual` | Writes prompt bundles to `outputs/<skill>/prompt_runs/` so Codex CLI, Claude Code, or another agent can generate the final artifacts. |
+
+Recommended Codex/Claude Code setup: call the `securitybook-to-skill` skill with
+the extracted pair and let the harness generate artifacts directly.
+
+```text
+$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
+```
+
+Deterministic regression/demo fallback:
+
+```bash
+python3 tools/generate_redteam_skill.py \
+  /tmp/book_skill_work/full_text.txt \
+  /tmp/book_skill_work/metadata.json \
+  --profile profiles/redteam \
+  --out outputs/redteam-owasp-wstg-mock \
+  --mode hybrid \
+  --provider mock \
+  --max-revisions 1
+```
+
+Direct agent generation from `full_text.txt` and `metadata.json` is the preferred quality path because Codex or Claude Code can synthesize richer prose than the rule-based fallback while still preserving source grounding. The `mock` provider exists for reproducible tests, regression checks, and demos where no external agent should write prose.
+
+Use `--mode rule` when you want the original deterministic generator. Use `--provider manual --dry-run-prompts` only when you specifically want prompt bundles instead of direct extracted-input generation.
 
 For an extracted HTML folder such as OFFSEC AI-300:
 
@@ -168,20 +234,140 @@ If you re-open a document often enough to wish you'd memorized it, it's a candid
 
 ## 🚀 Usage
 
-The Red Team/Pentest prototype is run in three explicit steps:
+The workflow has two separate phases. `securitybook-to-skill` focuses on **Phase 1: generating the skill**. Phase 2 depends on the host agent that will consume the generated folder.
+
+## Phase 1 — Generate a Skill with securitybook-to-skill
+
+Phase 1 is split into two parts:
+
+1. Python extraction produces `full_text.txt` and `metadata.json`.
+2. Codex or Claude Code reads those two files and writes the final skill artifacts directly, then the evaluator checks the result.
+
+This is the recommended quality path because pure rule-based generation is useful for regression tests, but it is too limited for rich skill prose.
+
+### Harness command entrypoints
+
+If you want to start Phase 1 from an agent harness instead of copying the full prompt manually:
+
+Important distinction: installing a workflow into a `skills/` directory makes it
+available as a **skill**, not automatically as a top-level `/name` slash command.
+Skills are normally invoked through the harness skill UI, an explicit skill
+mention such as `$securitybook-to-skill`, or implicit matching. Literal slash
+commands such as `/securitybook-to-skill` require a separate command/prompt shim
+for the harness.
+
+| Harness | Entrypoint | Setup |
+|---------|------------|-------|
+| Codex skill | `/skills` then choose `securitybook-to-skill`, or mention `$securitybook-to-skill` | Repo-local skill lives at `.agents/skills/securitybook-to-skill/SKILL.md`. Restart Codex if it does not appear. This is the preferred Codex surface. |
+| Claude Code | `/securitybook-to-skill <source-path> [output-slug]` | Repo-local command lives at `.claude/commands/securitybook-to-skill.md`. Restart Claude Code if it does not appear. |
+| Codex CLI | `/prompts:securitybook-to-skill <source-path> [output-slug]` | Copy `docs/harness/codex-securitybook-to-skill-prompt.md` to `~/.codex/prompts/securitybook-to-skill.md`, then restart Codex. |
+
+Codex note: the recommended Codex surface is the repo-local skill in `.agents/skills/securitybook-to-skill/`. Public Codex docs list custom slash prompts as deprecated and loaded from `~/.codex/prompts`, not from repo-local files. That means the literal repo-local `/securitybook-to-skill` command is available for Claude Code, while Codex should use `/skills`, `$securitybook-to-skill`, or the deprecated `/prompts:securitybook-to-skill` shim if you install it manually.
+
+Use the Codex skill directly:
+
+```text
+$securitybook-to-skill books_test/OWASP_Testing_Guide_v4.pdf redteam-owasp-wstg
+```
+
+If extraction has already been done, call the skill with the extracted pair and
+it will skip extraction and avoid `tools/generate_redteam_skill.py`:
+
+```text
+$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
+```
+
+Install the Codex prompt locally:
 
 ```bash
-# 1. Extract source text and metadata with technical mode
+mkdir -p ~/.codex/prompts
+cp docs/harness/codex-securitybook-to-skill-prompt.md ~/.codex/prompts/securitybook-to-skill.md
+```
+
+Then restart Codex and run:
+
+```text
+/prompts:securitybook-to-skill books_test/OWASP_Testing_Guide_v4.pdf redteam-owasp-wstg
+```
+
+### 1. Check dependencies
+
+```bash
+python3 scripts/extract.py --check
+```
+
+For technical PDFs, install Docling first:
+
+```bash
+pip3 install docling
+```
+
+### 2. Extract a source document
+
+For PDFs with code blocks, tables, commands, or security methodology, use technical mode:
+
+```bash
 python3 scripts/extract.py books_test/OWASP_Testing_Guide_v4.pdf --mode technical --no-install-missing
+```
 
-# 2. Generate Red Team/Pentest artifacts
-python3 tools/generate_redteam_skill.py \
-  /tmp/book_skill_work/full_text.txt \
-  /tmp/book_skill_work/metadata.json \
-  --profile profiles/redteam \
-  --out outputs/redteam-owasp-wstg-docling
+For an HTML/document folder such as OFFSEC AI-300:
 
-# 3. Evaluate quality and accuracy gates
+```bash
+python3 scripts/extract.py "books_test/OffSec - AI-300 Advanced AI Red Teaming" --mode technical --no-install-missing
+```
+
+Extraction writes:
+
+| File | Purpose |
+|------|---------|
+| `/tmp/book_skill_work/full_text.txt` | Source-marked extracted text used by Codex/Claude Code or fallback helpers |
+| `/tmp/book_skill_work/metadata.json` | Extraction metadata, source list, format, and extraction method |
+
+If you already have those two files, you can skip extraction. In that direct
+mode, Codex/Claude Code should generate artifacts directly from the extracted
+files and should not call `tools/generate_redteam_skill.py`.
+
+### 3. Generate artifacts directly with Codex or Claude Code
+
+Recommended path when extraction has already produced `full_text.txt` and
+`metadata.json`:
+
+```text
+$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
+```
+
+Or tell Codex/Claude Code directly:
+
+```text
+Generate a Red Team/Pentest Agent Skill directly from:
+- /tmp/book_skill_work/full_text.txt
+- /tmp/book_skill_work/metadata.json
+
+Write the output to:
+outputs/redteam-owasp-direct/
+
+Do not call tools/generate_redteam_skill.py. Build the concept plan, chapters,
+commands, workflows, safety guidance, coverage.json, and citations.json yourself
+from the extracted source and metadata. Then run the evaluator and fix FAIL items
+without weakening safety constraints.
+```
+
+The final output folder should contain:
+
+| Output | Purpose |
+|--------|---------|
+| `SKILL.md` | Main skill entry point |
+| `chapters/*.md` | Source-grounded concept chapters |
+| `checklist.md`, `commands.md`, `workflows.md` | Operational artifacts with safety context |
+| `troubleshooting.md`, `reporting.md`, `safety.md`, `references.md` | Support, reporting, authorized-use, and citation guidance |
+| `coverage.json`, `citations.json` | Machine-readable coverage and source traceability |
+| `evaluation.json`, `quality_report.md` | Generation quality result, evaluator messages, revision count, and sensitive-source flag |
+
+### 4. Evaluate explicitly
+
+Run the evaluator manually after Codex/Claude Code writes the artifacts:
+
+```bash
 python3 tools/evaluate_redteam_skill.py \
   outputs/redteam-owasp-wstg-docling \
   --profile profiles/redteam \
@@ -189,15 +375,101 @@ python3 tools/evaluate_redteam_skill.py \
   --metadata /tmp/book_skill_work/metadata.json
 ```
 
-Supported document formats still come from the original extractor: PDF, EPUB, DOCX, TXT, Markdown, reStructuredText, AsciiDoc, HTML, RTF, MOBI/AZW/AZW3.
+### 5. Optional helper/fallback modes
 
-For HTML/document folders such as OFFSEC AI-300:
+| Goal | Command options |
+|------|-----------------|
+| Recommended quality path | Call `$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json <slug>` and let Codex/Claude Code generate artifacts directly |
+| Render prompt bundles instead of direct generation | `--mode agent --provider manual --dry-run-prompts` |
+| Deterministic regression/demo run | `--mode hybrid --provider mock --max-revisions 1` |
+| Preserve the original deterministic renderer | `--mode rule --provider mock` |
+| Save prompt bundles while also writing deterministic fallback artifacts | `--mode hybrid --provider manual` |
+
+Deterministic fallback run:
 
 ```bash
-python3 scripts/extract.py "books_test/OffSec - AI-300 Advanced AI Red Teaming" --mode technical --no-install-missing
+python3 tools/generate_redteam_skill.py \
+  /tmp/book_skill_work/full_text.txt \
+  /tmp/book_skill_work/metadata.json \
+  --profile profiles/redteam \
+  --out outputs/redteam-owasp-wstg-mock \
+  --mode hybrid \
+  --provider mock \
+  --max-revisions 1
 ```
 
-The generated folder can then be copied into a compatible agent skill directory if you want to use the generated `SKILL.md` interactively.
+Use this fallback when you need reproducible CI output or want to debug extraction/evaluator behavior without relying on Codex/Claude Code prose generation.
+
+### 6. Review before use
+
+Before using or sharing generated artifacts:
+
+- Read `quality_report.md`; if `Result: FAIL`, inspect the evaluator messages.
+- If `sensitive_source_material: true`, redact credentials, tokens, passwords, hashes, or lab secrets before publishing.
+- Treat `commands.md` as authorized-use reference material only. Every command must keep its context, preconditions, expected output, safety note, and source reference.
+- Use generated skills only in lab, education, defense, owned, or explicitly authorized assessment environments.
+
+Supported document formats still come from the original extractor: PDF, EPUB, DOCX, TXT, Markdown, reStructuredText, AsciiDoc, HTML, RTF, MOBI/AZW/AZW3.
+
+## Phase 2 — Use the Generated Skill in an Agent
+
+Phase 2 starts after `outputs/<skill-name>/` exists and has passed review. This phase is not the main generator pipeline; it is how you consume the generated output in Codex, Claude Code, or another compatible agent.
+
+### Codex
+
+Use a project-local skill when you want the generated Red Team/Pentest skill available only inside this repo:
+
+```bash
+mkdir -p .agents/skills
+cp -R outputs/redteam-owasp-wstg-docling .agents/skills/redteam-owasp-wstg
+codex
+```
+
+Prompt Codex:
+
+```text
+Use the redteam-owasp-wstg skill to help me prepare an authorized web pentest checklist.
+Stay within scope, use the skill's safety guidance, and cite the generated artifacts you read.
+```
+
+Use a personal skill when you want it available across repos:
+
+```bash
+mkdir -p ~/.agents/skills
+cp -R outputs/redteam-owasp-wstg-docling ~/.agents/skills/redteam-owasp-wstg
+codex
+```
+
+Restart Codex if it does not detect the new skill.
+
+### Claude Code
+
+Use a project-local skill:
+
+```bash
+mkdir -p .claude/skills
+cp -R outputs/redteam-owasp-wstg-docling .claude/skills/redteam-owasp-wstg
+```
+
+Or use a personal skill:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R outputs/redteam-owasp-wstg-docling ~/.claude/skills/redteam-owasp-wstg
+```
+
+Restart Claude Code, then ask it to use the generated skill:
+
+```text
+Use the redteam-owasp-wstg skill. Build a scoped, authorized test workflow from its checklist, workflows, commands, and safety artifacts.
+```
+
+### Important Boundary
+
+Do not confuse the phases:
+
+- Phase 1 asks Codex/Claude Code to **generate or improve a skill from documents**. That is what this repository automates.
+- Phase 2 asks Codex/Claude Code to **use an already generated skill** during another task. That happens after the generated folder is copied into the agent's skill directory.
 
 ---
 
@@ -260,21 +532,26 @@ scripts/extract.py --mode technical
    prompts/         → artifact templates
                │
                ▼
- tools/generate_redteam_skill.py
-   classifies source type
-   extracts sections, concepts, commands, workflows, citations
-   writes full Red Team/Pentest artifact set
+ Codex or Claude Code (recommended)
+   reads full_text.txt + metadata.json
+   writes rich Markdown artifacts directly
+   fixes evaluator FAIL items without weakening safety
                │
                ▼
  outputs/<skill-name>/
    SKILL.md · chapters/ · checklist.md · commands.md
    workflows.md · troubleshooting.md · reporting.md
    safety.md · references.md · coverage.json · citations.json
+   evaluation.json · quality_report.md
                │
                ▼
  tools/evaluate_redteam_skill.py
    checks required artifacts, schema sections, command context,
    safety constraints, references, citations, and benchmark coverage
+
+ Optional side path:
+ tools/generate_redteam_skill.py
+   deterministic fallback, CI regression helper, or prompt-bundle renderer
 ```
 
 **Extraction benchmark** (103-page technical book, CPU only):
@@ -459,7 +736,7 @@ securitybook-to-skill/
 │       └── parsers/      # Format-specific parsers (pdf, epub, docx, html, rtf, calibre, text)
 ├── tools/
 │   ├── discovery_tax.py  # measures token cost vs context-dump / discovery loop
-│   ├── generate_redteam_skill.py   # Red Team/Pentest artifact generator
+│   ├── generate_redteam_skill.py   # optional Red Team/Pentest fallback/helper generator
 │   ├── evaluate_redteam_skill.py   # Red Team/Pentest quality evaluator
 │   └── validate_skill.py # checks a generated SKILL.md against host rules (--lens claude|copilot|amp)
 ├── tests/                # pytest suite (extraction, detection, discovery tax)

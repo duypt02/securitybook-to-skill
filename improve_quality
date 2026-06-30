@@ -1280,3 +1280,128 @@ Kiểm thử cuối:
 Nhận xét:
 - PEN200 hiện là output tốt nhất cho nhóm classic pentest vì đã có taxonomy riêng và nhiều command thực tế.
 - Vẫn nên thêm secret redaction nếu dùng output ngoài môi trường lab/báo cáo nội bộ, vì command có thể chứa hash, username/password hoặc token từ tài liệu nguồn.
+
+### 49. Nâng cấp agent-assisted skill generation (giai đoạn trung gian)
+Sau các vòng cải thiện deterministic generator, đã triển khai lớp agent runtime để Codex hoặc Claude Code có thể sinh prose artifact chất lượng hơn, trong khi Python vẫn giữ source grounding và evaluator hiện có.
+
+Mục tiêu ở giai đoạn trung gian:
+- Giữ `extract.py -> full_text.txt + metadata.json -> profiles/redteam -> generate -> evaluate`.
+- Thêm nhánh `section/concept plan -> prompt render -> Codex/Claude Code generate -> evaluator -> revision/fix loop`.
+- Không gọi API ngoài mặc định để test vẫn deterministic.
+- Chuẩn bị interface chung để sau này nối Codex CLI, Claude Code, OpenAI API hoặc Anthropic API.
+
+Sau khi làm rõ lại ý định ở bước 50, nhánh prompt render này không còn là đường chính. Đường chính là Codex/Claude Code đọc trực tiếp extracted pair và tự ghi artifacts.
+
+Đã sửa trong `tools/generate_redteam_skill.py`:
+- Thêm `--mode rule|agent|hybrid`.
+- `--mode rule` giữ deterministic output contract cũ.
+- `--mode agent` dùng để render prompt-backed artifact bundles. Với `--provider manual --dry-run-prompts`, đây là đường handoff trung gian nếu muốn prompt bundles; không phải workflow chính sau bước 50.
+- `--mode hybrid` là fallback/demo path: Python vẫn phụ trách sections, concepts, commands, citations, coverage, safety checks; provider phụ trách Markdown prose cho artifact có prompt.
+- Thêm `--provider mock|manual`.
+- Thêm `--dry-run-prompts`.
+- Thêm `--max-revisions`, mặc định `1`.
+
+Provider đã có:
+- `MockAgentProvider`: deterministic, dùng renderer hiện tại để giữ test reproducible; không phải đường chất lượng chính.
+- `ManualAgentProvider`: ghi prompt bundle vào `outputs/<skill>/prompt_runs/` để Codex CLI, Claude Code hoặc reviewer sinh artifact cuối.
+
+Prompt rendering hiện gồm:
+- Prompt template từ `profiles/redteam/prompts/`.
+- Required schema sections từ `schema.yaml`.
+- Source sections/chunks, citation IDs và excerpt.
+- Source-supported commands.
+- Metadata nguồn.
+- Safety constraints.
+- Revision feedback từ evaluator nếu vòng trước fail.
+
+Post-process mới:
+- `SKILL.md` được bổ sung required headings nếu provider trả thiếu.
+- `commands.md` được kiểm tra `Context of use` và `Safety note`.
+- `safety.md` được kiểm tra intended use, authorized environments, prohibited use, scope control và human oversight.
+- Nội dung thiếu được đánh dấu `not found in source` hoặc `context incomplete`.
+
+Quality outputs mới:
+- Mỗi non-dry-run generation ghi `evaluation.json`.
+- Mỗi non-dry-run generation ghi `quality_report.md`.
+- Nếu evaluator fail, message `FAIL`/`WARN` được đưa vào revision prompt.
+- Revision loop dừng đúng `--max-revisions`; nếu vẫn fail thì giữ output và ghi lỗi vào report.
+
+Safety bổ sung:
+- Scan `full_text.txt` để phát hiện dấu hiệu credential/token/password/lab secret.
+- Nếu có, `quality_report.md` ghi `sensitive_source_material: true`.
+- Đây là cảnh báo review/redaction, chưa phải redaction tự động.
+
+Test mới:
+- Prompt render có artifact name, schema, source context và safety rule.
+- Mock provider deterministic.
+- Dry-run prompt chỉ ghi `prompt_runs/*.prompt.md` và `manifest.json`, không ghi `SKILL.md`.
+- Rule mode không tạo `prompt_runs/` và không chạy revision.
+- Hybrid mode sinh required artifacts và `quality_report.md`.
+- Revision loop bị cap đúng `--max-revisions`.
+
+Kiểm thử sau nâng cấp:
+- Full repository tests: 156 passed.
+- `python3 scripts/extract.py --check`: banner vẫn đúng `securitybook-to-skill`.
+- `python3 -m py_compile tools/generate_redteam_skill.py tools/evaluate_redteam_skill.py`: không lỗi.
+
+Đánh giá tác động:
+- Reproducibility tốt vì test/regression có `mock`.
+- Pipeline không phụ thuộc network/API key.
+- Ở giai đoạn trung gian, prompt-only bằng `--provider manual --dry-run-prompts` được dùng để handoff sang Codex/Claude Code. Sau bước 50, đường chính được chỉnh lại thành direct extracted-input generation từ `full_text.txt` và `metadata.json`.
+- Kiến trúc đã sẵn sàng cho provider LLM thật mà không phải đổi profile schema.
+- Chất lượng semantic thực tế của LLM synthesis chưa được benchmark vì chưa gọi provider API mặc định.
+
+Điểm chất lượng sau nâng cấp runtime:
+- Artifact completeness: khoảng 9/10.
+- Safety: khoảng 9/10.
+- Traceability/citation: khoảng 8.5/10.
+- Runtime extensibility: khoảng 8.5/10.
+- Testability/reproducibility: khoảng 9/10.
+- Semantic synthesis potential: cao hơn bản deterministic khi Codex/Claude Code hoặc provider LLM thật xử lý extracted pair trực tiếp hoặc prompt bundles.
+
+Hạn chế còn lại:
+- `manual` provider chỉ ghi prompt bundle; điều phối Codex/Claude hiện là bước hướng dẫn vận hành, chưa tự động hóa trong tool.
+- `mock` provider không chứng minh chất lượng prose của LLM thật.
+- Sensitive source material mới được flag, chưa redact.
+- Revision loop còn coarse-grained, chưa diff theo từng section của artifact.
+- Evaluator vẫn keyword/rubric-based, chưa có gold-answer semantic judge.
+
+Kết luận sau bước 49:
+- Hướng đúng là agent-assisted hybrid pipeline, không quay lại rule-only generator.
+- Python nên tiếp tục giữ vai trò extract, source grounding, schema, citation, command safety và evaluator.
+- Codex/Claude Code hoặc Agent/LLM nên chỉ viết artifact prose dưới prompt constraints, source context và evaluator feedback.
+
+### 50. Làm rõ lại workflow chính: direct extracted-input generation
+Sau khi xác định lại ý định sử dụng thực tế, workflow chính cần được hiểu lại như sau:
+
+- Input chính cho harness là `/tmp/book_skill_work/full_text.txt` và `/tmp/book_skill_work/metadata.json`.
+- Codex/Claude Code phải có thể sinh toàn bộ skill artifacts trực tiếp từ hai file này.
+- Không cần gọi `tools/generate_redteam_skill.py` trong đường chính.
+- `tools/generate_redteam_skill.py` giữ vai trò baseline/fallback/regression helper.
+
+Workflow đúng:
+
+```text
+extract.py
+  -> full_text.txt + metadata.json
+  -> Codex/Claude Code direct generation
+  -> SKILL.md + chapters + checklist + commands + workflows + reports + safety + references + coverage/citations
+  -> evaluate_redteam_skill.py
+```
+
+Đã cập nhật:
+- Repo-local Codex skill `.agents/skills/securitybook-to-skill/SKILL.md` hỗ trợ direct extracted-input mode.
+- Claude command `.claude/commands/securitybook-to-skill.md` hỗ trợ direct extracted-input mode.
+- Codex prompt template `docs/harness/codex-securitybook-to-skill-prompt.md` hỗ trợ direct extracted-input mode.
+- README và architecture docs được chỉnh để không mô tả prompt-bundle/generator là đường chính.
+
+Cách gọi mong muốn:
+
+```text
+$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
+```
+
+Đánh giá điều chỉnh:
+- Rule-based generator vẫn có giá trị test, nhưng không nên là nguồn chất lượng chính.
+- Harness agent là nơi tạo prose artifacts chất lượng cao.
+- Evaluator là lớp kiểm soát khách quan sau generation.

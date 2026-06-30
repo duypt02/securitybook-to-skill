@@ -63,14 +63,16 @@ Five paths available. Route based on what the user asks:
 ### 5. Red Team/Pentest Profile (Prototype)
 **Trigger:** User asks for a Red Team, Pentest, offensive security, security testing, or assessment-focused skill; asks to use `--profile redteam`; or provides documents such as OWASP WSTG, NIST SP 800-115, OFFSEC/OSCP/PEN material, AI red-team material, or internal penetration-test methodology.
 
-**Action:** Preserve the core extraction pipeline, then use the standalone profile generator:
+**Action:** Preserve the core extraction pipeline, then generate the profile artifacts directly from extracted text and metadata:
 
 1. Run Step 0, Step 1, Step 1.5, and Step 2. For PDFs, prefer `BOOK_TYPE=technical` so Docling preserves structure.
 2. Load the profile contract from `profiles/redteam/schema.yaml`.
 3. Load the artifact contract from `profiles/redteam/artifacts.yaml`.
-4. Load prompt templates from `profiles/redteam/prompts/`.
-5. Run `tools/generate_redteam_skill.py`.
+4. Read `<tempdir>/book_skill_work/full_text.txt` and `<tempdir>/book_skill_work/metadata.json`.
+5. Generate the required skill files directly as an agent, preserving source grounding, citation line ranges, command context, and safety constraints.
 6. Run `tools/evaluate_redteam_skill.py` and report the quality findings.
+
+`tools/generate_redteam_skill.py` remains available as a deterministic baseline, prompt-bundle helper, and regression fallback, but the intended high-quality harness flow is direct agent generation from `full_text.txt` and `metadata.json`.
 
 **Output:** A Red Team/Pentest skill folder containing the original skill-style files plus profile-specific artifacts: `SKILL.md`, `chapters/`, `glossary.md`, `patterns.md`, `cheatsheet.md`, `checklist.md`, `commands.md`, `workflows.md`, `troubleshooting.md`, `reporting.md`, `safety.md`, `references.md`, `coverage.json`, and `citations.json`.
 
@@ -185,17 +187,22 @@ This creates:
 
 Read `<tempdir>/book_skill_work/metadata.json` to inspect the results.
 
-### Red Team/Pentest profile command path
+### Red Team/Pentest direct generation path
 
-When Mode 5 applies, do not rewrite the core book-to-skill generation steps. After extraction, run the profile generator against the extracted text and metadata:
+When Mode 5 applies, do not treat `tools/generate_redteam_skill.py` as the main quality path. After extraction, use the extracted pair directly:
 
-```bash
-python3 tools/generate_redteam_skill.py \
-  /tmp/book_skill_work/full_text.txt \
-  /tmp/book_skill_work/metadata.json \
-  --profile profiles/redteam \
-  --out outputs/<skill-name>
+```text
+/tmp/book_skill_work/full_text.txt
+/tmp/book_skill_work/metadata.json
 ```
+
+Generate the skill files yourself from those two files:
+
+- Read metadata first to identify source, extraction method, document profile, and scale.
+- Search `full_text.txt` selectively for headings, concept sections, commands, troubleshooting signals, reporting guidance, and safety constraints.
+- Write the required artifact set into `outputs/<skill-name>/`.
+- Create `coverage.json` and `citations.json` from the actual concepts and line ranges used.
+- Do not invent commands, targets, credentials, exploit objectives, citations, or unsupported claims.
 
 Then evaluate the generated skill:
 
