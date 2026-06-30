@@ -64,10 +64,15 @@ If no output slug is provided, derive one from the source filename or folder.
 
    **Per-chapter command extraction (required):**
    For each concept chapter, search the source text *within that concept's section* for
-   commands, code blocks, shell prompts, tool invocations, and example calls. If the
-   section contains them, list them in the chapter's `Related Commands` block and in
+   commands, code blocks, shell prompts, tool invocations, and example calls. Specifically
+   look for:
+   - Lines starting with shell prompts: `kali@kali:~$`, `PS C:\>`, `msf6>`, `meterpreter>`
+   - Lines inside fenced code blocks (``` or ~~~)
+   - Inline tool invocations: `nmap`, `impacket-*`, `crackmapexec`, `mimikatz`, `rubeus`,
+     `bloodhound`, `chisel`, `hashcat`, `hydra`, `msfconsole`, `searchsploit`, etc.
+   If the section contains them, list them in the chapter's `Related Commands` block and in
    `commands.md`. Do not copy commands from unrelated sections. If a section genuinely
-   has no commands, state `No commands documented in source for this concept.` — do not
+   has no commands after a thorough search, state `No commands documented in source for this concept.` — do not
    write `No source-supported commands detected` as a catch-all.
 
    **Source Summary formatting (required):**
@@ -76,6 +81,13 @@ If no output slug is provided, derive one from the source filename or folder.
    before writing bullets. Never start a bullet with `- ## Heading Name` or
    `- ### Sub-heading`. Rewrite the heading as a prose sentence if the information is
    relevant (e.g. `- The source covers X in section Y.`).
+   Also filter out:
+   - Truncated sentences that end mid-word or without punctuation (Docling extraction
+     artifacts, e.g. `- Next, we'll get  famil` — skip these entirely)
+   - Footnote or reference lines (e.g. `- 1068 (Microsoft, 2003), https://...`)
+   - Learning objective bullets (`- Understand X`, `- Learn how to Y`, `- Become familiar with Z`)
+   - Course structure bullets (`- In this Module, we will cover...`, `- This Learning Unit covers...`)
+   Only include bullets that convey substantive technical content about the concept.
 
    **Source-Derived Procedure specificity (required):**
    Steps in `## Source-Derived Procedure` must be derived from the actual test cases,

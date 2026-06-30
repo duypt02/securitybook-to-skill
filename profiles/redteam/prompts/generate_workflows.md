@@ -17,6 +17,11 @@ Quality requirements:
 - Generate one workflow per major concept that has a clear procedural flow
   in the source (e.g. a testing methodology, an attack sequence, an assessment
   phase). Do not generate a single generic workflow for the whole document.
+- **Do NOT generate a boilerplate "Source-Grounded Review Workflow"** that
+  lists every concept as "Map assessment tasks and evidence to <Concept>."
+  That pattern is useless — it adds no procedural information. Every workflow
+  must reflect real procedural steps from the source, not a list of concept
+  names repeated 20 times.
 - `Steps:` must be numbered and source-derived. Do not write generic steps
   like “Plan the engagement” unless the source explicitly describes that step.
   Reference the actual tools, commands, or techniques the source names.

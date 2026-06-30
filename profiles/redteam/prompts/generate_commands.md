@@ -27,9 +27,15 @@ Rules:
 
 Quality requirements:
 - `Purpose:` must be one sentence describing *what the command accomplishes*
-  (e.g. "Enumerate open ports on a target host", "Test whether the server
-  reveals version information via a malformed HTTP request"). Never write
-  "Source-supported command or tool invocation."
+  in the context of a security assessment — not a restatement of the source
+  caption or context field.
+  Good: "Enumerate open TCP/UDP ports on a target host to identify running services."
+  Good: "Perform a SYN scan to detect open ports without completing the TCP handshake."
+  Good: "Brute-force hostnames against a target domain to discover hidden subdomains."
+  Bad: "Performs DNS query: using host to find the A host record for www.example.com."
+  Bad: "Uses nmap to perform a SYN scan." (echoes tool + caption, no added value)
+  Bad: "Source-supported command or tool invocation."
+  The Purpose must add meaning beyond the tool name and the Context of use field.
 - `Context of use:` must explain *when, where, and why* the command is used
   in the assessment workflow. Write at least 25 words. Do not copy a raw
   sentence fragment from the source that describes output or response — describe
