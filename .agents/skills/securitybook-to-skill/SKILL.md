@@ -95,7 +95,29 @@ If no output slug is provided, derive one from the source filename or folder.
    - `Expected output:` — describe the expected output if the source provides it; otherwise
      write `not documented in source`.
 
-5. **Required output contract**
+5. **Per-artifact prompt guidance (required for quality)**
+   Before writing each artifact, read its prompt template from
+   `profiles/redteam/prompts/` if one exists:
+
+   | Artifact | Prompt file |
+   |----------|-------------|
+   | `SKILL.md` | `profiles/redteam/prompts/generate_skill.md` |
+   | `checklist.md` | `profiles/redteam/prompts/generate_checklist.md` |
+   | `commands.md` | `profiles/redteam/prompts/generate_commands.md` |
+   | `workflows.md` | `profiles/redteam/prompts/generate_workflows.md` |
+   | `troubleshooting.md` | `profiles/redteam/prompts/generate_troubleshooting.md` |
+   | `reporting.md` | `profiles/redteam/prompts/generate_reporting.md` |
+   | `safety.md` | `profiles/redteam/prompts/generate_safety.md` |
+   | `references.md` | `profiles/redteam/prompts/generate_references.md` |
+
+   Each prompt defines the required sections, quality rules, and output
+   constraints for that artifact. The rules in those files are in addition
+   to the quality requirements in Step 4 above — not instead of them.
+   For artifacts without a prompt file (`glossary.md`, `patterns.md`,
+   `cheatsheet.md`, `coverage.json`, `citations.json`), use the description
+   in `profiles/redteam/artifacts.yaml` as guidance.
+
+6. **Required output contract**
    Write these files before evaluation:
    - `SKILL.md`
    - `chapters/*.md`
@@ -112,7 +134,7 @@ If no output slug is provided, derive one from the source filename or folder.
    - `coverage.json`
    - `citations.json`
 
-6. **Evaluate**
+7. **Evaluate**
 
    ```bash
    python3 tools/evaluate_redteam_skill.py \
@@ -122,11 +144,11 @@ If no output slug is provided, derive one from the source filename or folder.
      --metadata /tmp/book_skill_work/metadata.json
    ```
 
-7. **Fix evaluator failures**
+8. **Fix evaluator failures**
    - Fix `FAIL` items without weakening safety constraints.
    - Re-run the evaluator until it passes or unresolved issues are clearly reported.
 
-8. **Report**
+9. **Report**
    - Output folder.
    - Evaluator pass/fail.
    - Any unresolved warnings/failures.
