@@ -13,12 +13,18 @@ generated skill is used during another task.
 
 The user should provide one or more source paths and may provide an output slug.
 
-Examples:
+Examples (argument format — invocation prefix depends on harness):
+
+| Harness | Invocation |
+|---------|------------|
+| Claude Code / OpenCode | `/securitybook-to-skill <args>` |
+| Codex | `$securitybook-to-skill <args>` |
+| Copilot / Agents | Skill triggers automatically; provide args in chat |
 
 ```text
-$securitybook-to-skill books_test/OWASP_Testing_Guide_v4.pdf redteam-owasp-wstg
-$securitybook-to-skill "books_test/OffSec - AI-300 Advanced AI Red Teaming" redteam-ai300
-$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
+books_test/OWASP_Testing_Guide_v4.pdf redteam-owasp-wstg
+"books_test/OffSec - AI-300 Advanced AI Red Teaming" redteam-ai300
+/tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
 ```
 
 If no output slug is provided, derive one from the source filename or folder.

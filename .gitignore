@@ -16,6 +16,9 @@ uv.lock
 # Local design specifications
 docs/superpowers/specs/
 
+# Generated DOCX comparison reports
+*.docx
+
 # MkDocs: build output + pages assembled from README/SKILL at deploy time
 # (docs/index.md is a committed landing page, NOT assembled)
 site/

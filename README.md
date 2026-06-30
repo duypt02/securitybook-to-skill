@@ -137,17 +137,23 @@ After Phase 1, copy the generated folder into the skill location for your agent:
 |-------|----------------------------------|-------------------------------|
 | Codex | `~/.agents/skills/` | `.agents/skills/` |
 | Claude Code | `~/.claude/skills/` | `.claude/skills/` |
-| GitHub Copilot CLI | `~/.copilot/skills/` or `~/.agents/skills/` | `.github/skills/` or `.agents/skills/` |
-| Amp | `~/.agents/skills/` or `~/.config/agents/skills/` | `.agents/skills/` |
+| GitHub Copilot / Agents | `~/.agents/skills/` | `.agents/skills/` |
+| OpenCode | `~/.config/opencode/skills/` | — |
 
-Example for Codex project-local usage:
+Use `install_skill.py` to install into any of these automatically:
+
+```bash
+python3 scripts/install_skill.py --output redteam-owasp-wstg-docling
+```
+
+Or manually for a specific project-local path:
 
 ```bash
 mkdir -p .agents/skills
 cp -R outputs/redteam-owasp-wstg-docling .agents/skills/redteam-owasp-wstg
 ```
 
-Then restart/open Codex in this repo and ask it to use the generated skill by name.
+Then restart/open the agent in this repo and ask it to use the generated skill by name.
 
 ### Agent runtime upgrade
 
@@ -172,8 +178,10 @@ Recommended Codex/Claude Code setup: call the `securitybook-to-skill` skill with
 the extracted pair and let the harness generate artifacts directly.
 
 ```text
-$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
+/securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
 ```
+
+(`$securitybook-to-skill` on Codex; `/securitybook-to-skill` on Claude Code / OpenCode.)
 
 Deterministic regression/demo fallback:
 
@@ -258,10 +266,17 @@ for the harness.
 
 | Harness | Entrypoint | Setup |
 |---------|------------|-------|
-| Codex skill | `/skills` then choose `securitybook-to-skill`, or mention `$securitybook-to-skill` | Repo-local skill lives at `.agents/skills/securitybook-to-skill/SKILL.md`. Restart Codex if it does not appear. This is the preferred Codex surface. |
-| Claude Code | `/securitybook-to-skill <source-path> [output-slug]` | Repo-local command lives at `.claude/commands/securitybook-to-skill.md`. Restart Claude Code if it does not appear. |
+| Codex | `$securitybook-to-skill <source-path> [output-slug]` | Install globally: `python3 scripts/install_skill.py --harness codex`. Repo-local: `.agents/skills/securitybook-to-skill/SKILL.md`. |
+| Claude Code | `/securitybook-to-skill <source-path> [output-slug]` | Install globally: `python3 scripts/install_skill.py --harness claude`. Repo-local command: `.claude/commands/securitybook-to-skill.md`. |
+| OpenCode | `/securitybook-to-skill <source-path> [output-slug]` | Install globally: `python3 scripts/install_skill.py --harness opencode`. |
+| GitHub Copilot / Agents | Invoke skill `securitybook-to-skill` with source path | Install globally: `python3 scripts/install_skill.py --harness copilot`. |
 
-Codex note: the recommended Codex surface is the repo-local skill in `.agents/skills/securitybook-to-skill/`. Use `/skills` or `$securitybook-to-skill` to invoke it.
+Install into all harnesses at once:
+
+```bash
+python3 scripts/install_skill.py          # install the tool into all harnesses
+python3 scripts/install_skill.py --dry-run  # preview without writing
+```
 
 ### 1. Check dependencies
 
@@ -306,10 +321,12 @@ Recommended path when extraction has already produced `full_text.txt` and
 `metadata.json`:
 
 ```text
-$securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
+/securitybook-to-skill /tmp/book_skill_work/full_text.txt /tmp/book_skill_work/metadata.json redteam-owasp-direct
 ```
 
-Or tell Codex/Claude Code directly:
+(Use `$securitybook-to-skill` on Codex. On GitHub Copilot, invoke the skill by name with the source path in chat.)
+
+Or tell any agent directly:
 
 ```text
 Generate a Red Team/Pentest Agent Skill directly from:
@@ -388,50 +405,37 @@ Supported document formats still come from the original extractor: PDF, EPUB, DO
 
 Phase 2 starts after `outputs/<skill-name>/` exists and has passed review. This phase is not the main generator pipeline; it is how you consume the generated output in Codex, Claude Code, or another compatible agent.
 
-### Codex
+### Install a generated skill with `install_skill.py`
 
-Use a project-local skill when you want the generated Red Team/Pentest skill available only inside this repo:
-
-```bash
-mkdir -p .agents/skills
-cp -R outputs/redteam-owasp-wstg-docling .agents/skills/redteam-owasp-wstg
-codex
-```
-
-Prompt Codex:
-
-```text
-Use the redteam-owasp-wstg skill to help me prepare an authorized web pentest checklist.
-Stay within scope, use the skill's safety guidance, and cite the generated artifacts you read.
-```
-
-Use a personal skill when you want it available across repos:
+The `scripts/install_skill.py` script installs a generated output skill into one or more harnesses automatically:
 
 ```bash
-mkdir -p ~/.agents/skills
-cp -R outputs/redteam-owasp-wstg-docling ~/.agents/skills/redteam-owasp-wstg
-codex
+# Install into all harnesses (copilot, claude, opencode, codex)
+python3 scripts/install_skill.py --output redteam-owasp-wstg-docling
+
+# Include chapters/ directory in the install
+python3 scripts/install_skill.py --output redteam-owasp-wstg-docling --copy-chapters
+
+# Install into specific harnesses only
+python3 scripts/install_skill.py --output redteam-owasp-wstg-docling --harness claude,codex
+
+# Preview without writing
+python3 scripts/install_skill.py --output redteam-owasp-wstg-docling --dry-run
+
+# Override the install name
+python3 scripts/install_skill.py --output redteam-owasp-wstg-docling --name redteam-owasp
 ```
 
-Restart Codex if it does not detect the new skill.
+The script creates harness-specific `SKILL.md` files (with the correct frontmatter and adapter blocks for each host), copies supporting artifacts, and writes command dispatch stubs where needed.
 
-### Claude Code
+| Install path | Harness |
+|---|---|
+| `~/.agents/skills/<name>/` | GitHub Copilot / Agents |
+| `~/.claude/skills/<name>/` + `~/.claude/commands/<name>.md` | Claude Code |
+| `~/.config/opencode/skills/<name>/` | OpenCode |
+| `~/.codex/skills/<name>/` | Codex |
 
-Use a project-local skill:
-
-```bash
-mkdir -p .claude/skills
-cp -R outputs/redteam-owasp-wstg-docling .claude/skills/redteam-owasp-wstg
-```
-
-Or use a personal skill:
-
-```bash
-mkdir -p ~/.claude/skills
-cp -R outputs/redteam-owasp-wstg-docling ~/.claude/skills/redteam-owasp-wstg
-```
-
-Restart Claude Code, then ask it to use the generated skill:
+Once installed, prompt the agent:
 
 ```text
 Use the redteam-owasp-wstg skill. Build a scoped, authorized test workflow from its checklist, workflows, commands, and safety artifacts.
@@ -701,6 +705,7 @@ securitybook-to-skill/
 ├── profiles/redteam/     # Red Team/Pentest schema, artifacts, prompts, and benchmark expectations
 ├── scripts/
 │   ├── extract.py        # Thin entrypoint wrapper
+│   ├── install_skill.py  # Install the tool or a generated skill into AI harnesses
 │   └── extractor/        # Modular extraction package
 │       ├── config.py     # Extensions, paths, dependency constants
 │       ├── dependencies.py  # optional-dep probing + --check
