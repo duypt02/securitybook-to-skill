@@ -289,6 +289,34 @@ extract.py
 - `general_redteam` benchmark: tài liệu generic không còn bị WARN về thiếu rubric.
 - Canonical harness: `.agents/skills/securitybook-to-skill/SKILL.md` — các file khác là stubs tham chiếu về canonical.
 
+### Vòng 11 — Per-artifact prompt templates + quality rules cho tất cả 7 prompts
+
+**Vấn đề phát hiện:**
+- Harness sinh artifact theo Step 4 tổng quát → output đồng nhất, không tận dụng hướng dẫn cụ thể per-artifact.
+- 6/7 prompt file chỉ có list "must include" + 3 generic rules → harness viết theo pattern chứ không theo source.
+- `generate_reporting.md` có line-wrap ở dòng cuối ("...lab work\n.") từ lần tạo ban đầu.
+- Root `SKILL.md` Mode 5 còn mô tả quy trình cũ thay vì delegate đúng cách.
+- `README.md` còn tham chiếu đến `de_xuat_mo_rong_redteam.md`, `improve_quality`, và `docs/harness/` đã xóa.
+
+**Thay đổi:**
+63. Thêm **Step 5** vào canonical `.agents/skills/securitybook-to-skill/SKILL.md`:
+    Trước mỗi artifact, đọc `profiles/redteam/prompts/<artifact>.md` và áp dụng quality rules của file đó. Nếu file không tồn tại, dùng `description:` từ `artifacts.yaml`. Step 6–9 renumber lại.
+64. Cải thiện `generate_skill.md`: Skill Name lấy từ metadata, Procedure tham chiếu artifact files, Tools+Commands lấy từ `commands.md`, có Chapter Index section, giới hạn 4000 tokens.
+65. Cải thiện `generate_checklist.md`: Section 1 (authorization) phải là FIRST, format `- [ ] <verb>`, label `(generic default)` cho items không có trong source, stop conditions ở Section 7.
+66. Cải thiện `generate_workflows.md`: 1 workflow/concept, steps numbered + source-derived, decision points format `If [condition] → [action]`, đánh dấu `[GAP]` khi thiếu source coverage.
+67. Cải thiện `generate_troubleshooting.md`: keyword search list cụ thể (`error`, `fail`, `timeout`...), phân biệt source-supported vs `(generic default)`.
+68. Cải thiện `generate_reporting.md`: Finding template 10 fields bắt buộc, Citation ID từ `citations.json`, không invent CVE/CVSS không có trong source.
+69. Cải thiện `generate_safety.md`: Phải có đúng các evaluator-required terms (`authorized`, `prohibited`, `scope`, `human oversight`), phân section bắt buộc, không được làm yếu đi nội dung từ source.
+70. Cải thiện `generate_references.md`: Format `[REF-N] filename — format, extracted via method`, 3 sections tách biệt (tools/frameworks vs standards vs methodology), note về coverage.json và citations.json.
+71. Sửa root `SKILL.md` Mode 5: simplified — delegate trực tiếp đến canonical `.agents/skills/`.
+72. Sửa `README.md`: Xóa 3 tham chiếu stale (deleted files), xóa Codex CLI row, xóa "Install Codex prompt" section.
+
+**Kết quả:**
+- Tests: **160 passed** (không thay đổi, prompt improvements không ảnh hưởng test).
+- Harness có hướng dẫn per-artifact cụ thể cho tất cả 7 output files.
+- `generate_reporting.md` line-wrap bug fixed.
+- Không còn stale reference trong README và root SKILL.md.
+
 ---
 
 ## 4. Kết quả tổng hợp
@@ -346,6 +374,8 @@ Sau khi chuyển sang harness path, output `outputs/redteam-owasp-wstg-docling` 
 - ~~Tách evaluator khỏi generator~~ ✅ done (vòng 10 — `redteam_shared.py`)
 - ~~Thêm quality gate cho command Purpose và Source Summary~~ ✅ done (vòng 10)
 - ~~Thêm `general_redteam` benchmark~~ ✅ done (vòng 10)
+- ~~Cải thiện tất cả 7 per-artifact prompt templates~~ ✅ done (vòng 11)
+- ~~Thêm per-artifact prompt reading vào canonical harness Step 5~~ ✅ done (vòng 11)
 - Regenerate harness output (`redteam-owasp-wstg-docling`) để pass evaluator mới.
 - Thêm secret redaction cho command output từ lab/courseware.
 - Parser request/code block sâu hơn để tăng OWASP command count.
