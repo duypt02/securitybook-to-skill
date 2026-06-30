@@ -60,23 +60,31 @@ Five paths available. Route based on what the user asks:
 **Action:** Run Step 0 (out-of-scope check), Step 1 (validate inputs), Step 1.5 (identify book type), and Step 2 (extract new files). Then skip to Step 5 (identify/detect existing skill path) and run the **Update / Fold-in Workflow** to merge the new content into the existing skill files.
 **Output:** Updated existing skill with new/revised chapter summaries and merged indexes/glossaries.
 
-### 5. Red Team/Pentest Profile (Prototype)
+### 5. Red Team/Pentest Profile
 **Trigger:** User asks for a Red Team, Pentest, offensive security, security testing, or assessment-focused skill; asks to use `--profile redteam`; or provides documents such as OWASP WSTG, NIST SP 800-115, OFFSEC/OSCP/PEN material, AI red-team material, or internal penetration-test methodology.
 
-**Action:** Preserve the core extraction pipeline, then generate the profile artifacts directly from extracted text and metadata:
+**Action:** Run Step 0, Step 1, Step 1.5, and Step 2 to extract source text. Then delegate entirely to the specialized harness:
 
-1. Run Step 0, Step 1, Step 1.5, and Step 2. For PDFs, prefer `BOOK_TYPE=technical` so Docling preserves structure.
-2. Load the profile contract from `profiles/redteam/schema.yaml`.
-3. Load the artifact contract from `profiles/redteam/artifacts.yaml`.
-4. Read `<tempdir>/book_skill_work/full_text.txt` and `<tempdir>/book_skill_work/metadata.json`.
-5. Generate the required skill files directly as an agent, preserving source grounding, citation line ranges, command context, and safety constraints.
-6. Run `tools/evaluate_redteam_skill.py` and report the quality findings.
+> Read `.agents/skills/securitybook-to-skill/SKILL.md` and follow every step of
+> the workflow defined there, passing the extracted `full_text.txt` and
+> `metadata.json` as inputs.
 
-`tools/generate_redteam_skill.py` is retained as a **comparison baseline** — running both paths on the same source lets you measure the quality difference between deterministic rule-based output and harness-generated output. The intended high-quality harness flow is direct agent generation from `full_text.txt` and `metadata.json`.
+That skill handles artifact generation, quality rules (command Purpose specificity,
+Source Summary formatting, per-chapter command extraction, procedure specificity),
+evaluation, and reporting. Do not reimplement its workflow here.
 
-**Output:** A Red Team/Pentest skill folder containing the original skill-style files plus profile-specific artifacts: `SKILL.md`, `chapters/`, `glossary.md`, `patterns.md`, `cheatsheet.md`, `checklist.md`, `commands.md`, `workflows.md`, `troubleshooting.md`, `reporting.md`, `safety.md`, `references.md`, `coverage.json`, and `citations.json`.
+`tools/generate_redteam_skill.py` is retained as a **comparison baseline** — running
+both paths on the same source lets you measure the quality difference between
+deterministic rule-based output and harness-generated output.
 
-Use the profile as an academic prototype and demo path, not as an autonomous attack system. Generated commands must keep placeholders, source citations, command context, and safety notes. Always preserve authorized-use constraints and scope boundaries.
+**Output:** A Red Team/Pentest skill folder under `outputs/<slug>/` containing 14
+required artifacts: `SKILL.md`, `chapters/`, `glossary.md`, `patterns.md`,
+`cheatsheet.md`, `checklist.md`, `commands.md`, `workflows.md`, `troubleshooting.md`,
+`reporting.md`, `safety.md`, `references.md`, `coverage.json`, `citations.json`.
+
+Use the output for authorized lab, education, defense, or explicitly approved
+assessment environments only. Generated commands must keep source citations, context
+of use, and safety notes.
 
 ---
 
@@ -189,32 +197,17 @@ Read `<tempdir>/book_skill_work/metadata.json` to inspect the results.
 
 ### Red Team/Pentest direct generation path
 
-When Mode 5 applies, do not treat `tools/generate_redteam_skill.py` as the main quality path. After extraction, use the extracted pair directly:
+When Mode 5 applies, extraction produces the usual output pair:
 
 ```text
 /tmp/book_skill_work/full_text.txt
 /tmp/book_skill_work/metadata.json
 ```
 
-Generate the skill files yourself from those two files:
-
-- Read metadata first to identify source, extraction method, document profile, and scale.
-- Search `full_text.txt` selectively for headings, concept sections, commands, troubleshooting signals, reporting guidance, and safety constraints.
-- Write the required artifact set into `outputs/<skill-name>/`.
-- Create `coverage.json` and `citations.json` from the actual concepts and line ranges used.
-- Do not invent commands, targets, credentials, exploit objectives, citations, or unsupported claims.
-
-Then evaluate the generated skill:
-
-```bash
-python3 tools/evaluate_redteam_skill.py \
-  outputs/<skill-name> \
-  --profile profiles/redteam \
-  --source /tmp/book_skill_work/full_text.txt \
-  --metadata /tmp/book_skill_work/metadata.json
-```
-
-For report/demo runs, include the evaluator result plus a short qualitative note. For example: methodology documents such as NIST SP 800-115 can score well on workflow, reporting, and evidence coverage even when `commands.md` intentionally contains few or no executable commands.
+After extraction, stop following the general Steps 3–10 and delegate to the
+specialized harness. Read `.agents/skills/securitybook-to-skill/SKILL.md` and
+follow its complete workflow — it defines artifact generation, quality rules,
+evaluation, and reporting for this path.
 
 ---
 
