@@ -319,6 +319,24 @@ extract.py
 
 ---
 
+### Vòng 12 — Thực nghiệm so sánh Harness vs Rule-based + DOCX report
+
+73. Sửa evaluator bug: `check_chapter_command_coverage` trả về `False` khi chỉ có WARN → đổi thành `return True` (WARN-only, không phải hard FAIL). Tests giữ nguyên 160/160.
+74. Regenerate `outputs/redteam-owasp-wstg-docling` với harness path: fix 11 Purpose fields (mô tả ngữ nghĩa cụ thể từ source) + clean 11 chapter Source Summary (xóa `- ## Heading` artifacts từ Docling). **RESULT: PASS**.
+75. Extract PEN200/OSCP PDF (48 MB, ~5 phút Docling): profile `classic_pentest`, 20 chapters (AD, privesc, lateral movement, metasploit, tunneling...), 80 commands. Rule-based auto-fix 80 Purpose + 19 heading artifacts. **RESULT: PASS**.
+76. Tạo `outputs/redteam-owasp-rule/` bằng rule-based generator trên cùng nguồn OWASP WSTG v4 làm comparison baseline. **RESULT: FAIL** (rubric 100/100 nhưng fail 2 quality checks).
+77. Thực nghiệm so sánh có kiểm soát: cùng source, cùng Docling, khác phương pháp sinh — xác nhận rubric keyword không phân biệt được chất lượng (cả hai đạt 100/100), nhưng 3 quality checks mới phân biệt rõ ràng.
+78. Phát hiện: **template-driven artifacts** (SKILL.md, safety.md, checklist.md, procedure steps) đồng nhất byte-for-byte giữa hai phương pháp; chỉ **prose-dependent artifacts** (Purpose field, Source Summary) mới khác biệt.
+79. Xuất báo cáo so sánh khoa học `so_sanh_harness_vs_rule_based.docx` (Times New Roman, 5 phần, 5 bảng có zebra-striping).
+
+**Kết quả:**
+- Harness: RESULT PASS, Purpose avg 219 chars (cụ thể, context-aware), 0 heading artifacts.
+- Rule-based: RESULT FAIL, Purpose avg 44 chars (placeholder cố định), 30 heading artifacts.
+- Legacy rubric: **không phân biệt được** (cả hai 100/100).
+- Tốc độ: rule-based 0.7s vs harness ~5–10 phút.
+
+---
+
 ## 4. Kết quả tổng hợp
 
 ### Điểm chất lượng theo vòng cải thiện (rule-based path)
@@ -335,12 +353,13 @@ extract.py
 | Evaluator quality gate rigor | 2/10 | 6/10 | 7/10 | **8.5/10** |
 | **Overall (rule-based)** | **~3/10** | **~8/10** | **~8.3-8.5/10** | **~8.3-8.5/10** |
 
-### Harness path (Claude Code / Codex direct generation)
+### Harness path (Claude Code / Copilot direct generation)
 
-Sau khi chuyển sang harness path, output `outputs/redteam-owasp-wstg-docling` đạt:
-- Rubric evaluator: **100/100** (`owasp_web` benchmark).
+Sau khi chuyển sang harness path, output `outputs/redteam-owasp-wstg-docling` đạt (vòng 12, đã regenerate):
+- Rubric evaluator: **100/100** (`owasp_web` benchmark). **RESULT: PASS** (all 13 checks including 3 quality checks).
 - Required concepts: 6/6. Commands: 11/5 (min). Command terms: 3/3.
-- Tất cả required artifacts: PASS. Safety: PASS. Semantic alignment: PASS.
+- Purpose fields: 0/11 generic, avg 219 chars (content-specific, source-derived).
+- Source Summary: 0 heading artifacts. Tất cả required artifacts: PASS. Safety: PASS.
 
 ---
 
@@ -365,7 +384,7 @@ Sau khi chuyển sang harness path, output `outputs/redteam-owasp-wstg-docling` 
 - Evaluator vẫn keyword/rubric-based; 3 quality checks mới (vòng 10) cải thiện nhưng chưa có gold-answer semantic judge.
 - Taxonomy chưa bao phủ: wireless pentest, social engineering, adversary emulation, compliance audit.
 - Chưa có merge/ranking đa nguồn khi sinh skill từ nhiều tài liệu lớn cùng lúc.
-- Harness output hiện có (`redteam-owasp-wstg-docling`) sinh trước quality rules mới — cần regenerate để pass `check_command_purpose_quality` và `check_source_summary_cleanliness`.
+- ~~Harness output (`redteam-owasp-wstg-docling`) cần regenerate~~ ✅ done (vòng 12 — RESULT: PASS với tất cả 13 checks).
 
 ---
 
@@ -376,9 +395,10 @@ Sau khi chuyển sang harness path, output `outputs/redteam-owasp-wstg-docling` 
 - ~~Thêm `general_redteam` benchmark~~ ✅ done (vòng 10)
 - ~~Cải thiện tất cả 7 per-artifact prompt templates~~ ✅ done (vòng 11)
 - ~~Thêm per-artifact prompt reading vào canonical harness Step 5~~ ✅ done (vòng 11)
-- Regenerate harness output (`redteam-owasp-wstg-docling`) để pass evaluator mới.
+- ~~Regenerate harness output (`redteam-owasp-wstg-docling`) để pass evaluator mới~~ ✅ done (vòng 12)
+- ~~So sánh có hệ thống: rule-based vs harness output trên cùng nguồn~~ ✅ done (vòng 12 — exported DOCX)
 - Thêm secret redaction cho command output từ lab/courseware.
 - Parser request/code block sâu hơn để tăng OWASP command count.
 - Mở rộng gold benchmark cho API, mobile, cloud-native, AD pentest.
 - Thêm gold-answer semantic rubric thay thế keyword matching.
-- So sánh có hệ thống: rule-based vs harness output trên cùng nguồn (đây là lý do giữ generator làm baseline).
+- Benchmark thêm nguồn: PEN200 harness path (hiện chỉ có rule-based PASS).
