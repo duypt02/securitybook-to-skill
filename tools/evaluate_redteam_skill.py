@@ -96,6 +96,234 @@ def command_lines(skill_dir: Path) -> list[str]:
     ]
 
 
+def output_markdown_text(skill_dir: Path) -> str:
+    excluded = {"quality_report.md", "source_coverage_report.md"}
+    return "\n".join(
+        path.read_text(encoding="utf-8", errors="ignore")
+        for path in sorted(skill_dir.rglob("*.md"))
+        if path.name not in excluded and "prompt_runs" not in path.parts
+    )
+
+
+def normalize_text_key(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def source_headings(source: str) -> list[dict]:
+    headings = []
+    ignored = {"contents", "table of contents", "references", "index"}
+    for line_no, line in enumerate(source.splitlines(), 1):
+        match = re.match(r"^#{1,4}\s+(.+?)\s*$", line)
+        if not match:
+            continue
+        title = match.group(1).strip()
+        key = normalize_text_key(title)
+        if len(key) < 4 or key in ignored or title.lower().startswith("source:"):
+            continue
+        headings.append({"line": line_no, "title": title, "key": key})
+    return headings
+
+
+def source_command_candidates(source: str) -> list[dict]:
+    command_terms = (
+        "nmap", "curl", "wget", "nc ", "netcat", "openssl", "sslyze", "testssl",
+        "sqlmap", "nikto", "zap", "burp", "metasploit", "msfconsole", "hydra",
+        "hashcat", "chisel", "bloodhound", "impacket", "rubeus", "mimikatz",
+    )
+    prompt_re = re.compile(r"(?:kali@kali:~\$|PS [^>]+>|msf6>|meterpreter>|[$#]\s+)(.+)")
+    found: dict[str, dict] = {}
+    in_fence = False
+    for line_no, raw_line in enumerate(source.splitlines(), 1):
+        line = raw_line.strip()
+        if line.startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        candidate = ""
+        prompt_match = prompt_re.search(line)
+        if prompt_match:
+            candidate = prompt_match.group(1).strip()
+        elif in_fence or any(term in f"{line.lower()} " for term in command_terms):
+            candidate = line
+        candidate = re.sub(r"\s+", " ", candidate).strip()
+        if not candidate or len(candidate) < 4:
+            continue
+        if any(marker.lower() in candidate.lower() for marker in OUTPUT_MARKERS):
+            continue
+        key = normalize_text_key(candidate)
+        if len(key) < 4:
+            continue
+        found.setdefault(key, {"line": line_no, "command": candidate, "key": key})
+    return list(found.values())
+
+
+def source_procedure_markers(source: str) -> list[dict]:
+    marker_re = re.compile(
+        r"\b(how to test|test objectives?|expected results?|procedure|steps?|"
+        r"evidence|reporting|remediation|mitigation)\b",
+        re.IGNORECASE,
+    )
+    markers = []
+    for line_no, raw_line in enumerate(source.splitlines(), 1):
+        line = raw_line.strip()
+        if len(line) < 8 or not marker_re.search(line):
+            continue
+        markers.append({"line": line_no, "text": line[:220], "key": normalize_text_key(line)})
+    return markers
+
+
+def source_expected_concepts(source: str, taxonomy: list[dict]) -> list[dict]:
+    lowered = source.lower()
+    expected = []
+    for item in taxonomy:
+        aliases = [str(alias) for alias in item.get("aliases", [])]
+        if any(alias.lower() in lowered for alias in aliases):
+            expected.append(
+                {
+                    "key": item.get("key", ""),
+                    "name": item.get("name", ""),
+                    "category": item.get("category", ""),
+                    "matched_aliases": [alias for alias in aliases if alias.lower() in lowered],
+                }
+            )
+    return expected
+
+
+def covered_by_output(items: list[dict], output_text: str, label_key: str) -> tuple[list[dict], list[dict]]:
+    output_key = normalize_text_key(output_text)
+    covered, missing = [], []
+    for item in items:
+        key = item.get("key") or normalize_text_key(str(item.get(label_key, "")))
+        label = normalize_text_key(str(item.get(label_key, "")))
+        is_covered = bool(key and key in output_key) or bool(label and label in output_key)
+        (covered if is_covered else missing).append(item)
+    return covered, missing
+
+
+def citation_line_coverage(skill_dir: Path, source: str) -> dict:
+    citations_path = skill_dir / "citations.json"
+    source_lines = source.splitlines()
+    nonblank_lines = {idx for idx, line in enumerate(source_lines, 1) if line.strip()}
+    if not citations_path.exists() or not nonblank_lines:
+        return {"covered_lines": 0, "source_lines": len(nonblank_lines), "coverage_ratio": 0.0}
+    covered_lines: set[int] = set()
+    for citation in read_json(citations_path).get("citations", []):
+        try:
+            if isinstance(citation.get("source_lines"), list) and len(citation["source_lines"]) >= 2:
+                start = int(citation["source_lines"][0])
+                end = int(citation["source_lines"][1])
+            else:
+                start = int(citation.get("line_start", 0))
+                end = int(citation.get("line_end", 0))
+        except (TypeError, ValueError):
+            continue
+        covered_lines.update(range(max(start, 1), min(end, len(source_lines)) + 1))
+    covered_nonblank = covered_lines & nonblank_lines
+    return {
+        "covered_lines": len(covered_nonblank),
+        "source_lines": len(nonblank_lines),
+        "coverage_ratio": round(len(covered_nonblank) / len(nonblank_lines), 4),
+    }
+
+
+def write_source_coverage_report(skill_dir: Path, report: dict) -> None:
+    json_path = skill_dir / "source_coverage_report.json"
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    summary = report["summary"]
+    lines = [
+        "# Source Coverage Report",
+        "",
+        "This report measures the generated Skill against the original source document.",
+        "",
+        "## Summary",
+        f"- Source concepts covered: {summary['concepts_covered']}/{summary['source_concepts']} ({summary['concept_coverage_ratio']:.0%})",
+        f"- Source headings covered: {summary['headings_covered']}/{summary['source_headings']} ({summary['heading_coverage_ratio']:.0%})",
+        f"- Source commands covered: {summary['commands_covered']}/{summary['source_commands']} ({summary['command_coverage_ratio']:.0%})",
+        f"- Source procedure markers covered: {summary['procedure_markers_covered']}/{summary['source_procedure_markers']} ({summary['procedure_marker_coverage_ratio']:.0%})",
+        f"- Citation line coverage: {summary['citation_lines_covered']}/{summary['source_nonblank_lines']} ({summary['citation_line_coverage_ratio']:.0%})",
+        "",
+        "## Missing Source Concepts",
+        *[f"- {item['name']} ({item['key']})" for item in report["missing"]["concepts"][:25]],
+        "",
+        "## Missing Source Commands",
+        *[f"- line {item['line']}: `{item['command']}`" for item in report["missing"]["commands"][:25]],
+    ]
+    md_path = skill_dir / "source_coverage_report.md"
+    md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def build_source_coverage_report(skill_dir: Path, source_path: Path) -> dict:
+    source = source_path.read_text(encoding="utf-8", errors="ignore")
+    output_text = output_markdown_text(skill_dir)
+    coverage_path = skill_dir / "coverage.json"
+    coverage = read_json(coverage_path) if coverage_path.exists() else {}
+    taxonomy = coverage.get("taxonomy") or TAXONOMY
+    source_concepts = source_expected_concepts(source, taxonomy)
+    source_heading_items = source_headings(source)
+    source_commands = source_command_candidates(source)
+    source_procedures = source_procedure_markers(source)
+    concept_covered, concept_missing = covered_by_output(source_concepts, output_text, "name")
+    heading_covered, heading_missing = covered_by_output(source_heading_items, output_text, "title")
+    command_covered, command_missing = covered_by_output(source_commands, output_text, "command")
+    procedure_covered, procedure_missing = covered_by_output(source_procedures, output_text, "text")
+    line_coverage = citation_line_coverage(skill_dir, source)
+
+    def ratio(covered: int, total: int) -> float:
+        return round(covered / total, 4) if total else 1.0
+
+    summary = {
+        "source_concepts": len(source_concepts),
+        "concepts_covered": len(concept_covered),
+        "concept_coverage_ratio": ratio(len(concept_covered), len(source_concepts)),
+        "source_headings": len(source_heading_items),
+        "headings_covered": len(heading_covered),
+        "heading_coverage_ratio": ratio(len(heading_covered), len(source_heading_items)),
+        "source_commands": len(source_commands),
+        "commands_covered": len(command_covered),
+        "command_coverage_ratio": ratio(len(command_covered), len(source_commands)),
+        "source_procedure_markers": len(source_procedures),
+        "procedure_markers_covered": len(procedure_covered),
+        "procedure_marker_coverage_ratio": ratio(len(procedure_covered), len(source_procedures)),
+        "citation_lines_covered": line_coverage["covered_lines"],
+        "source_nonblank_lines": line_coverage["source_lines"],
+        "citation_line_coverage_ratio": line_coverage["coverage_ratio"],
+    }
+    return {
+        "source": str(source_path),
+        "skill_dir": str(skill_dir),
+        "summary": summary,
+        "covered": {
+            "concepts": concept_covered,
+            "headings": heading_covered[:100],
+            "commands": command_covered[:100],
+            "procedure_markers": procedure_covered[:100],
+        },
+        "missing": {
+            "concepts": concept_missing,
+            "headings": heading_missing[:100],
+            "commands": command_missing[:100],
+            "procedure_markers": procedure_missing[:100],
+        },
+    }
+
+
+def check_source_coverage_report(skill_dir: Path, source_path: Path | None, messages: list[str]) -> bool:
+    if source_path is None:
+        messages.append("WARN source coverage report skipped; source not provided")
+        return True
+    report = build_source_coverage_report(skill_dir, source_path)
+    write_source_coverage_report(skill_dir, report)
+    summary = report["summary"]
+    messages.append(
+        "INFO source coverage report written: "
+        f"concepts {summary['concepts_covered']}/{summary['source_concepts']}, "
+        f"headings {summary['headings_covered']}/{summary['source_headings']}, "
+        f"commands {summary['commands_covered']}/{summary['source_commands']}, "
+        f"procedure markers {summary['procedure_markers_covered']}/{summary['source_procedure_markers']}, "
+        f"citation lines {summary['citation_lines_covered']}/{summary['source_nonblank_lines']}"
+    )
+    return True
+
+
 def load_benchmark(profile_dir: Path, document_profile: str) -> dict | None:
     benchmark_path = profile_dir / "benchmarks" / "gold_set.json"
     if not benchmark_path.exists():
@@ -557,6 +785,7 @@ def evaluate(skill_dir: Path, profile_dir: Path, source_path: Path | None = None
         check_chapter_command_coverage(skill_dir, messages),
         check_safety(skill_dir, messages),
         check_rubric(skill_dir, profile_dir, messages),
+        check_source_coverage_report(skill_dir, source_path, messages),
     ]
     return all(checks), messages
 

@@ -113,6 +113,27 @@ def test_generate_and_evaluate_redteam_skill(tmp_path):
     )
 
 
+def test_evaluator_writes_source_coverage_report(tmp_path):
+    full_text, metadata = write_lab_fixture(tmp_path)
+    out_dir = tmp_path / "outputs" / "lab-skill"
+    profile_dir = ROOT_DIR / "profiles" / "redteam"
+
+    generate(full_text, metadata, profile_dir, out_dir)
+    evaluate(out_dir, profile_dir, source_path=full_text, metadata_path=metadata)
+
+    report_path = out_dir / "source_coverage_report.json"
+    md_path = out_dir / "source_coverage_report.md"
+    assert report_path.exists()
+    assert md_path.exists()
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    summary = report["summary"]
+    assert summary["source_concepts"] >= 2
+    assert summary["concepts_covered"] >= 1
+    assert summary["source_commands"] >= 1
+    assert "command_coverage_ratio" in summary
+    assert "citation_line_coverage_ratio" in summary
+
+
 def test_prompt_render_includes_artifact_schema_source_and_safety(tmp_path):
     full_text, metadata_path = write_lab_fixture(tmp_path)
     out_dir = tmp_path / "outputs" / "prompt-render"

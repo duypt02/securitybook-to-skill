@@ -65,7 +65,7 @@ Five paths available. Route based on what the user asks:
 
 **Action:** Run Step 0, Step 1, Step 1.5, and Step 2 to extract source text. Then delegate entirely to the specialized harness:
 
-> Read `.agents/skills/securitybook-to-skill/SKILL.md` and follow every step of
+> Read `securitybook-to-skill/.agents/skills/securitybook-to-skill/SKILL.md` and follow every step of
 > the workflow defined there, passing the extracted `full_text.txt` and
 > `metadata.json` as inputs.
 
@@ -205,7 +205,7 @@ When Mode 5 applies, extraction produces the usual output pair:
 ```
 
 After extraction, stop following the general Steps 3–10 and delegate to the
-specialized harness. Read `.agents/skills/securitybook-to-skill/SKILL.md` and
+specialized harness. Read `securitybook-to-skill/.agents/skills/securitybook-to-skill/SKILL.md` and
 follow its complete workflow — it defines artifact generation, quality rules,
 evaluation, and reporting for this path.
 

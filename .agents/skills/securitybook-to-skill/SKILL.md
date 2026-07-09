@@ -59,6 +59,11 @@ If no output slug is provided, derive one from the source filename or folder.
 4. **Generate skill artifacts directly**
    Generate artifacts yourself from `full_text.txt` and `metadata.json`; do not
    call `tools/generate_redteam_skill.py` for the main path.
+   - Do not create, modify, or use generator/helper scripts under `scripts/`,
+     `tools/`, or the repository root during the Harness path. Write generated
+     artifacts directly under `outputs/<output-slug>/`. Temporary scratch work,
+     if absolutely needed, must stay under `/tmp` and must not become the source
+     of truth for generated artifacts.
    - Read `metadata.json` first to identify source title, format, extraction method, token size, and source filename.
    - Use targeted searches over `full_text.txt` instead of loading the whole file when it is large.
    - Build a concept plan from source headings and Red Team/Pentest taxonomy.
@@ -163,12 +168,17 @@ If no output slug is provided, derive one from the source filename or folder.
    ```
 
 8. **Fix evaluator failures**
-   - Fix `FAIL` items without weakening safety constraints.
+   - Fix `FAIL` items directly in generated artifacts under `outputs/<output-slug>/`
+     without weakening safety constraints.
+   - Do not fix evaluator failures by creating or editing a generator/helper script.
    - Re-run the evaluator until it passes or unresolved issues are clearly reported.
 
 9. **Report**
    - Output folder.
    - Evaluator pass/fail.
+   - Source coverage report: `source_coverage_report.json` and
+     `source_coverage_report.md`, including concrete counts for source concepts,
+     headings, commands, procedure markers, and citation line coverage.
    - Any unresolved warnings/failures.
    - Whether sensitive source material appears to require redaction.
 
